@@ -1,0 +1,129 @@
+# ─── Shared environment ───────────────────────────────────────────────────────
+x-app-env: &app-env
+  DATABASE_URL:            postgresql://dates_user:dates_pass@postgres:5432/dates_db
+  REDIS_URL:               redis://redis:6379
+  AUTH_SECRET:             change-me-in-production-min-32-chars
+  NEXT_PUBLIC_APP_URL:     http://localhost:3000
+  WHATSAPP_PROVIDER:       evolution
+  EVOLUTION_API_URL:       http://evolution:8080
+  EVOLUTION_API_KEY:       evolution_secret
+  EVOLUTION_INSTANCE:      dates-instance
+  REMINDER_HOURS_BEFORE:   "24"
+
+services:
+
+  # ── PostgreSQL ───────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER:     dates_user
+      POSTGRES_PASSWORD: dates_pass
+      POSTGRES_DB:       dates_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dates_user -d dates_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis ────────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ── Database migrations ──────────────────────────────────────────────────────
+  migrate:
+    build: .
+    environment:
+      <<: *app-env
+    command: >
+      sh -c "npx prisma migrate deploy && npx tsx prisma/seed.ts"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  # ── Next.js app ──────────────────────────────────────────────────────────────
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+    ports:
+      - "3000:3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      evolution:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/api/auth/session || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── BullMQ Worker ─────────────────────────────────────────────────────────────
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  # ── Evolution API (WhatsApp) ─────────────────────────────────────────────────
+  # La app Next.js debe usar EVOLUTION_API_KEY = mismo valor que AUTHENTICATION_API_KEY.
+  # Con app en host: EVOLUTION_API_URL=http://localhost:8080; con app en Docker: usa http://evolution:8080 (x-app-env).
+  evolution:
+    image: atendai/evolution-api:v2.2.3
+    restart: unless-stopped
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    environment:
+      SERVER_URL:                http://evolution:8080
+      AUTHENTICATION_API_KEY:    evolution_secret
+      CORS_ORIGIN:               "*"
+      WEBSOCKET_ENABLED:         "true"
+      WEBSOCKET_GLOBAL_EVENTS:   "true"
+      DATABASE_ENABLED:          "true"
+      DATABASE_PROVIDER:         postgresql
+      DATABASE_CONNECTION_URI:   postgresql://dates_user:dates_pass@postgres:5432/dates_db?schema=public
+      DATABASE_CONNECTION_CLIENT_NAME: evolution_exchange
+      CACHE_REDIS_ENABLED:       "true"
+      CACHE_REDIS_URI:           redis://redis:6379
+    volumes:
+      - evolution_data:/evolution/instances
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  redis_data:
+  evolution_data:

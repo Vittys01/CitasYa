@@ -1,0 +1,222 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Prisma Schema — Dates SaaS (Nail Salon Appointment Manager)
+// ─────────────────────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  MANICURIST
+  RECEPTIONIST
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum NotificationType {
+  CONFIRMATION
+  REMINDER_24H
+  CANCELLATION
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+// ─── Users & Auth ─────────────────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String
+  name          String
+  role          Role      @default(RECEPTIONIST)
+  isActive      Boolean   @default(true)
+  avatarUrl     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // NextAuth sessions (if using DB sessions)
+  sessions      Session[]
+  manicurist    Manicurist?
+
+  @@index([email])
+  @@index([role])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([token])
+  @@index([userId])
+}
+
+// ─── Manicurists ──────────────────────────────────────────────────────────────
+
+model Manicurist {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bio          String?
+  // Hex color for calendar differentiation
+  color        String   @default("#ec4899")
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  schedules    Schedule[]
+  blockedTimes BlockedTime[]
+  appointments Appointment[]
+
+  @@index([isActive])
+}
+
+// ─── Schedules (weekly availability) ─────────────────────────────────────────
+
+model Schedule {
+  id           String     @id @default(cuid())
+  manicuristId String
+  manicurist   Manicurist @relation(fields: [manicuristId], references: [id], onDelete: Cascade)
+  // 0 = Sunday … 6 = Saturday
+  dayOfWeek    Int
+  startTime    String     // "09:00"
+  endTime      String     // "18:00"
+  isActive     Boolean    @default(true)
+
+  @@unique([manicuristId, dayOfWeek])
+  @@index([manicuristId])
+}
+
+// ─── Blocked Times (vacations, breaks) ───────────────────────────────────────
+
+model BlockedTime {
+  id           String     @id @default(cuid())
+  manicuristId String
+  manicurist   Manicurist @relation(fields: [manicuristId], references: [id], onDelete: Cascade)
+  startAt      DateTime
+  endAt        DateTime
+  reason       String?
+  createdAt    DateTime   @default(now())
+
+  @@index([manicuristId, startAt, endAt])
+}
+
+// ─── Services ─────────────────────────────────────────────────────────────────
+
+model Service {
+  id           String   @id @default(cuid())
+  name         String
+  description  String?
+  // duration in minutes
+  duration     Int
+  price        Decimal  @db.Decimal(10, 2)
+  color        String   @default("#a855f7")
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  appointments Appointment[]
+
+  @@index([isActive])
+}
+
+// ─── Clients ──────────────────────────────────────────────────────────────────
+
+model Client {
+  id           String   @id @default(cuid())
+  name         String
+  // Stored in E.164 format: +54911XXXXXXXX
+  phone        String   @unique
+  email        String?
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  appointments Appointment[]
+
+  @@index([phone])
+  @@index([name])
+}
+
+// ─── Appointments ─────────────────────────────────────────────────────────────
+
+model Appointment {
+  id           String            @id @default(cuid())
+  clientId     String
+  client       Client            @relation(fields: [clientId], references: [id])
+  manicuristId String
+  manicurist   Manicurist        @relation(fields: [manicuristId], references: [id])
+  serviceId    String
+  service      Service           @relation(fields: [serviceId], references: [id])
+
+  startAt      DateTime
+  endAt        DateTime
+  status       AppointmentStatus @default(PENDING)
+  // Price snapshot at booking time (service price may change later)
+  price        Decimal           @db.Decimal(10, 2)
+  notes        String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  notifications Notification[]
+
+  // Prevent double-booking: unique range enforced in application layer
+  // Index order optimised for "get appointments for manicurist X on date Y"
+  @@index([manicuristId, startAt])
+  @@index([clientId])
+  @@index([startAt])
+  @@index([status])
+  @@index([startAt, endAt])
+}
+
+// ─── App settings (labels, copy, config) ──────────────────────────────────────
+
+model AppSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique  // e.g. "nav.dashboard", "role.MANICURIST"
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([key])
+}
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+model Notification {
+  id            String             @id @default(cuid())
+  appointmentId String
+  appointment   Appointment        @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  type          NotificationType
+  status        NotificationStatus @default(PENDING)
+  // WhatsApp message ID returned by provider
+  externalId    String?
+  error         String?
+  scheduledFor  DateTime?
+  sentAt        DateTime?
+  createdAt     DateTime           @default(now())
+
+  @@index([appointmentId])
+  @@index([status, scheduledFor])
+  @@index([type])
+}
