@@ -47,7 +47,9 @@ services:
 
   # ── Database migrations ──────────────────────────────────────────────────────
   migrate:
-    build: .
+    build:
+      context: .
+      target: builder
     environment:
       <<: *app-env
     command: >
