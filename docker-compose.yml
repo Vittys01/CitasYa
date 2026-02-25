@@ -51,7 +51,7 @@ services:
     environment:
       <<: *app-env
     command: >
-      sh -c "npx prisma migrate deploy && npx tsx prisma/seed.ts"
+      sh -c "./node_modules/.bin/prisma migrate deploy && ./node_modules/.bin/tsx prisma/seed.ts"
     depends_on:
       postgres:
         condition: service_healthy
