@@ -24,20 +24,23 @@ const createSchema = z.object({
 export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json(apiError("Unauthorized", "AUTH"), { status: 401 });
+  const businessId = session.user.businessId;
+  if (!businessId) return NextResponse.json(apiError("No business context"), { status: 403 });
 
   const { searchParams } = req.nextUrl;
   const date = searchParams.get("date");
   const weekStart = searchParams.get("weekStart");
   const manicuristId = searchParams.get("manicuristId") ?? undefined;
+  const options = { businessId, manicuristId };
 
   try {
     if (weekStart) {
-      const data = await getAppointmentsByWeek(new Date(weekStart), manicuristId);
+      const data = await getAppointmentsByWeek(new Date(weekStart), options);
       return NextResponse.json(apiSuccess(data));
     }
 
     const target = date ? new Date(date) : new Date();
-    const data = await getAppointmentsByDate(target, manicuristId);
+    const data = await getAppointmentsByDate(target, options);
     return NextResponse.json(apiSuccess(data));
   } catch (err) {
     return NextResponse.json(apiError(String(err)), { status: 500 });

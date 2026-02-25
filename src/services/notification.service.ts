@@ -8,7 +8,7 @@
 import { prisma } from "@/lib/db";
 import { getAppSettings } from "@/services/settings.service";
 import {
-  whatsapp,
+  getProviderForInstance,
   buildConfirmationMessage,
   buildReminderMessage,
   buildCancellationMessage,
@@ -54,10 +54,17 @@ export async function processNotification(
     });
   }
 
-  const { client, service, manicurist } = appointment;
+  const { client, service, manicurist, businessId } = appointment;
   const manicuristName = manicurist.user.name;
 
-  const settings = await getAppSettings();
+  const [settings, business] = await Promise.all([
+    getAppSettings(businessId),
+    prisma.business.findUnique({
+      where: { id: businessId },
+      select: { whatsappInstanceName: true },
+    }),
+  ]);
+  const provider = getProviderForInstance(business?.whatsappInstanceName ?? undefined);
   const templateConfirmation = settings["whatsapp.template.confirmation"];
   const templateReminder = settings["whatsapp.template.reminder"];
   const templateCancellation = settings["whatsapp.template.cancellation"];
@@ -101,7 +108,7 @@ export async function processNotification(
       throw new Error(`Unknown notification type: ${type}`);
   }
 
-  const result = await whatsapp.sendText({ to: client.phone, body });
+  const result = await provider.sendText({ to: client.phone, body });
 
   await prisma.notification.update({
     where: { id: notification.id },

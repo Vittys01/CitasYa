@@ -20,9 +20,11 @@ const createSchema = z.object({
 export async function GET(_req: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json(apiError("Unauthorized"), { status: 401 });
+  const businessId = session.user.businessId;
+  if (!businessId) return NextResponse.json(apiError("No business context"), { status: 403 });
 
   const services = await prisma.service.findMany({
-    where: { isActive: true },
+    where: { businessId, isActive: true },
     orderBy: { name: "asc" },
   });
 
@@ -32,9 +34,11 @@ export async function GET(_req: NextRequest) {
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json(apiError("Unauthorized"), { status: 401 });
-  if (session.user.role !== "ADMIN") {
+  if (session.user.role !== "ADMIN" && session.user.role !== "OWNER") {
     return NextResponse.json(apiError("Forbidden"), { status: 403 });
   }
+  const businessId = session.user.businessId;
+  if (!businessId) return NextResponse.json(apiError("No business context"), { status: 403 });
 
   const body = await req.json();
   const parsed = createSchema.safeParse(body);
@@ -42,6 +46,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(apiError(parsed.error.message, "VALIDATION"), { status: 422 });
   }
 
-  const service = await prisma.service.create({ data: parsed.data });
+  const service = await prisma.service.create({
+    data: { ...parsed.data, businessId },
+  });
   return NextResponse.json(apiSuccess(service), { status: 201 });
 }

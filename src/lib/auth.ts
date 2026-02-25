@@ -5,11 +5,12 @@ import { z } from "zod";
 import { prisma } from "./db";
 import type { Role } from "@prisma/client";
 
-// Extend the session to include role, id, and optional manicuristId
+// Extend the session to include role, id, businessId (active business), and optional manicuristId
 declare module "next-auth" {
   interface User {
     id: string;
     role: Role;
+    businessId?: string | null;
     manicuristId?: string | null;
   }
   interface Session {
@@ -18,18 +19,12 @@ declare module "next-auth" {
       name: string;
       email: string;
       role: Role;
+      businessId?: string | null;
       manicuristId?: string | null;
     };
   }
 }
 
-declare module "@auth/core/jwt" {
-  interface JWT {
-    id: string;
-    role: Role;
-    manicuristId?: string | null;
-  }
-}
 
 const loginSchema = z.object({
   email: z.string().email().transform((s) => s.trim().toLowerCase()),
@@ -84,8 +79,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             name: true,
             password: true,
             role: true,
+            businessId: true,
             isActive: true,
-            manicurist: { select: { id: true } },
+            manicurist: { select: { id: true, businessId: true } },
           },
         });
 
@@ -113,11 +109,24 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           return null;
         }
 
+        let businessId: string | null =
+          user.role === "MANICURIST"
+            ? user.manicurist?.businessId ?? null
+            : user.businessId ?? null;
+        if (user.role === "OWNER" && !businessId) {
+          const first = await prisma.business.findFirst({
+            where: { ownerId: user.id },
+            select: { id: true },
+          });
+          businessId = first?.id ?? null;
+        }
+
         return {
           id: user.id,
           email: user.email,
           name: user.name,
           role: user.role,
+          businessId,
           manicuristId: user.manicurist?.id ?? null,
         };
       },
@@ -126,16 +135,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   callbacks: {
     jwt({ token, user }) {
       if (user) {
-        token.id = user.id;
-        token.role = user.role;
-        token.manicuristId = user.manicuristId ?? null;
+        // JWT extends Record<string, unknown> so these are safe assignments
+        (token as Record<string, unknown>).id = user.id;
+        (token as Record<string, unknown>).role = user.role;
+        (token as Record<string, unknown>).businessId = user.businessId ?? null;
+        (token as Record<string, unknown>).manicuristId = user.manicuristId ?? null;
       }
       return token;
     },
     session({ session, token }) {
-      session.user.id = token.id;
-      session.user.role = token.role;
-      session.user.manicuristId = token.manicuristId ?? null;
+      const t = token as Record<string, unknown>;
+      session.user.id = t.id as string;
+      session.user.role = t.role as Role;
+      session.user.businessId = (t.businessId as string | null | undefined) ?? null;
+      session.user.manicuristId = (t.manicuristId as string | null | undefined) ?? null;
       return session;
     },
   },

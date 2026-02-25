@@ -4,14 +4,18 @@ import type { DashboardStats, ManicuristProductivity } from "@/types";
 export async function getDashboardStats(
   from: Date,
   to: Date,
-  manicuristId?: string
+  options?: { businessId?: string; manicuristId?: string }
 ): Promise<DashboardStats> {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const todayEnd = new Date(today);
   todayEnd.setHours(23, 59, 59, 999);
 
-  const maniFilter = manicuristId ? { manicuristId } : {};
+  const baseFilter = {
+    ...(options?.businessId ? { businessId: options.businessId } : {}),
+    ...(options?.manicuristId ? { manicuristId: options.manicuristId } : {}),
+  };
+  const maniFilter = baseFilter;
 
   const [
     todayAppointments,
@@ -55,11 +59,13 @@ export async function getDashboardStats(
 export async function getManicuristProductivity(
   from: Date,
   to: Date,
+  businessId?: string,
   filterManicuristId?: string
 ): Promise<ManicuristProductivity[]> {
   const manicurists = await prisma.manicurist.findMany({
     where: {
       isActive: true,
+      ...(businessId ? { businessId } : {}),
       ...(filterManicuristId ? { id: filterManicuristId } : {}),
     },
     include: {

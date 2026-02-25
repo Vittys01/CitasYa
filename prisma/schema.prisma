@@ -14,6 +14,7 @@ datasource db {
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
 enum Role {
+  OWNER
   ADMIN
   MANICURIST
   RECEPTIONIST
@@ -38,6 +39,36 @@ enum NotificationStatus {
   FAILED
 }
 
+// ─── Businesses (multi-tenant) ─────────────────────────────────────────────────
+
+model Business {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ownerId   String
+  owner     User     @relation("BusinessOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  // WhatsApp: one instance per business (Evolution instance name or Meta config)
+  whatsappProvider       String?  // "evolution" | "meta"
+  whatsappInstanceName    String? // Evolution: e.g. "empresa-1"
+  metaPhoneNumberId      String?
+  metaAccessToken        String?
+
+  members       User[]       @relation("UserBusiness")
+  manicurists   Manicurist[]
+  clients       Client[]
+  services      Service[]
+  appSettings   AppSetting[]
+  appointments  Appointment[]
+
+  @@index([ownerId])
+  @@index([slug])
+}
+
 // ─── Users & Auth ─────────────────────────────────────────────────────────────
 
 model User {
@@ -48,15 +79,18 @@ model User {
   role          Role      @default(RECEPTIONIST)
   isActive      Boolean   @default(true)
   avatarUrl     String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  businessId       String?
+  business        Business?  @relation("UserBusiness", fields: [businessId], references: [id], onDelete: SetNull)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
 
-  // NextAuth sessions (if using DB sessions)
-  sessions      Session[]
-  manicurist    Manicurist?
+  sessions        Session[]
+  manicurist      Manicurist?
+  businessesOwned  Business[] @relation("BusinessOwner")
 
   @@index([email])
   @@index([role])
+  @@index([businessId])
 }
 
 model Session {
@@ -74,20 +108,22 @@ model Session {
 // ─── Manicurists ──────────────────────────────────────────────────────────────
 
 model Manicurist {
-  id           String   @id @default(cuid())
-  userId       String   @unique
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  bio          String?
-  // Hex color for calendar differentiation
-  color        String   @default("#ec4899")
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id          String    @id @default(cuid())
+  userId      String    @unique
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessId  String
+  business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  bio         String?
+  color       String    @default("#ec4899")
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   schedules    Schedule[]
   blockedTimes BlockedTime[]
   appointments Appointment[]
 
+  @@index([businessId])
   @@index([isActive])
 }
 
@@ -124,37 +160,41 @@ model BlockedTime {
 // ─── Services ─────────────────────────────────────────────────────────────────
 
 model Service {
-  id           String   @id @default(cuid())
-  name         String
-  description  String?
-  // duration in minutes
-  duration     Int
-  price        Decimal  @db.Decimal(10, 2)
-  color        String   @default("#a855f7")
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id          String    @id @default(cuid())
+  businessId  String
+  business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  duration    Int
+  price       Decimal   @db.Decimal(10, 2)
+  color       String    @default("#a855f7")
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   appointments Appointment[]
 
+  @@index([businessId])
   @@index([isActive])
 }
 
 // ─── Clients ──────────────────────────────────────────────────────────────────
 
 model Client {
-  id           String   @id @default(cuid())
-  name         String
-  // Stored in E.164 format: +54911XXXXXXXX
-  phone        String   @unique
-  email        String?
-  notes        String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name       String
+  phone      String   // E.164
+  email      String?
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   appointments Appointment[]
 
-  @@index([phone])
+  @@unique([businessId, phone])
+  @@index([businessId])
   @@index([name])
 }
 
@@ -162,43 +202,45 @@ model Client {
 
 model Appointment {
   id           String            @id @default(cuid())
+  businessId   String
+  business     Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
   clientId     String
-  client       Client            @relation(fields: [clientId], references: [id])
+  client       Client           @relation(fields: [clientId], references: [id])
   manicuristId String
-  manicurist   Manicurist        @relation(fields: [manicuristId], references: [id])
+  manicurist   Manicurist       @relation(fields: [manicuristId], references: [id])
   serviceId    String
-  service      Service           @relation(fields: [serviceId], references: [id])
+  service      Service          @relation(fields: [serviceId], references: [id])
 
-  startAt      DateTime
-  endAt        DateTime
-  status       AppointmentStatus @default(PENDING)
-  // Price snapshot at booking time (service price may change later)
-  price        Decimal           @db.Decimal(10, 2)
-  notes        String?
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
+  startAt     DateTime
+  endAt       DateTime
+  status      AppointmentStatus @default(PENDING)
+  price       Decimal           @db.Decimal(10, 2)
+  notes       String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
 
   notifications Notification[]
 
-  // Prevent double-booking: unique range enforced in application layer
-  // Index order optimised for "get appointments for manicurist X on date Y"
+  @@index([businessId])
   @@index([manicuristId, startAt])
   @@index([clientId])
   @@index([startAt])
   @@index([status])
-  @@index([startAt, endAt])
 }
 
 // ─── App settings (labels, copy, config) ──────────────────────────────────────
 
 model AppSetting {
-  id        String   @id @default(cuid())
-  key       String   @unique  // e.g. "nav.dashboard", "role.MANICURIST"
-  value     String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  key        String
+  value      String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  @@index([key])
+  @@unique([businessId, key])
+  @@index([businessId])
 }
 
 // ─── Notifications ────────────────────────────────────────────────────────────

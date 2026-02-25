@@ -18,11 +18,16 @@ type Params = { params: Promise<{ id: string }> };
 export async function PATCH(req: NextRequest, { params }: Params) {
   const session = await auth();
   if (!session) return NextResponse.json(apiError("Unauthorized"), { status: 401 });
-  if (session.user.role !== "ADMIN") {
+  if (session.user.role !== "ADMIN" && session.user.role !== "OWNER") {
     return NextResponse.json(apiError("Forbidden"), { status: 403 });
   }
+  const businessId = session.user.businessId;
+  if (!businessId) return NextResponse.json(apiError("No business context"), { status: 403 });
 
   const { id } = await params;
+  const existing = await prisma.service.findFirst({ where: { id, businessId } });
+  if (!existing) return NextResponse.json(apiError("Servicio no encontrado"), { status: 404 });
+
   const body = await req.json();
   const parsed = updateSchema.safeParse(body);
   if (!parsed.success) {
@@ -36,13 +41,16 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 export async function DELETE(_req: NextRequest, { params }: Params) {
   const session = await auth();
   if (!session) return NextResponse.json(apiError("Unauthorized"), { status: 401 });
-  if (session.user.role !== "ADMIN") {
+  if (session.user.role !== "ADMIN" && session.user.role !== "OWNER") {
     return NextResponse.json(apiError("Forbidden"), { status: 403 });
   }
+  const businessId = session.user.businessId;
+  if (!businessId) return NextResponse.json(apiError("No business context"), { status: 403 });
 
   const { id } = await params;
+  const existing = await prisma.service.findFirst({ where: { id, businessId } });
+  if (!existing) return NextResponse.json(apiError("Servicio no encontrado"), { status: 404 });
 
-  // Block hard delete if the service has linked appointments
   const apptCount = await prisma.appointment.count({ where: { serviceId: id } });
   if (apptCount > 0) {
     return NextResponse.json(

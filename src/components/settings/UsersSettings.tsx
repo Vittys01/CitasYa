@@ -12,12 +12,14 @@ type UserWithManicurist = User & {
 type ScheduleRow = { dayOfWeek: number; startTime: string; endTime: string; isActive: boolean };
 
 const roleBadge: Record<string, { bg: string; text: string; border: string }> = {
-  ADMIN:        { bg: "bg-[#EDE7F6]", text: "text-[#5E35B1]", border: "border-[#D1C4E9]" },
-  MANICURIST:   { bg: "bg-primary/10", text: "text-primary-dark", border: "border-primary/20" },
+  OWNER:       { bg: "bg-amber-50", text: "text-amber-800", border: "border-amber-200" },
+  ADMIN:       { bg: "bg-[#EDE7F6]", text: "text-[#5E35B1]", border: "border-[#D1C4E9]" },
+  MANICURIST:  { bg: "bg-primary/10", text: "text-primary-dark", border: "border-primary/20" },
   RECEPTIONIST: { bg: "bg-[#E3F2FD]", text: "text-[#1565C0]", border: "border-[#BBDEFB]" },
 };
 
 const roleLabel: Record<string, string> = {
+  OWNER: "Dueño",
   ADMIN: "Administrador",
   MANICURIST: "Manicurista",
   RECEPTIONIST: "Recepcionista",

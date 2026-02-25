@@ -7,12 +7,19 @@ import { getAppSettings } from "@/services/settings.service";
 export default async function EquipoPage() {
   const session = await auth();
   if (!session) redirect("/login");
-  if (session.user.role !== "ADMIN") redirect("/dashboard");
+  if (session.user.role !== "ADMIN" && session.user.role !== "OWNER") redirect("/dashboard");
+  const businessId = session.user.businessId!;
 
   const [settings, users] = await Promise.all([
-    getAppSettings(),
+    getAppSettings(businessId),
     prisma.user.findMany({
-      where: { isActive: true },
+      where: {
+        isActive: true,
+        OR: [
+          { businessId },
+          { manicurist: { businessId } },
+        ],
+      },
       orderBy: { name: "asc" },
       include: { manicurist: { include: { schedules: true } } },
     }),

@@ -9,6 +9,7 @@ import TodayAppointments from "@/components/dashboard/TodayAppointments";
 
 export default async function DashboardPage() {
   const session = await auth();
+  const businessId = session?.user.businessId!;
   const isManicurist = session?.user.role === "MANICURIST";
   const manicuristId = session?.user.manicuristId ?? undefined;
 
@@ -16,12 +17,12 @@ export default async function DashboardPage() {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
   const [settings, stats, productivity, todayAppts] = await Promise.all([
-    getAppSettings(),
-    getDashboardStats(monthStart, now, isManicurist ? manicuristId : undefined),
+    getAppSettings(businessId),
+    getDashboardStats(monthStart, now, { businessId, manicuristId: isManicurist ? manicuristId : undefined }),
     isManicurist
       ? Promise.resolve([])
       : getManicuristProductivity(monthStart, now),
-    getAppointmentsByDate(now, isManicurist ? manicuristId : undefined),
+    getAppointmentsByDate(now, { businessId, manicuristId: isManicurist ? manicuristId : undefined }),
   ]);
 
   const todayApptsForClient = todayAppts.map(serializeAppointmentPrice);

@@ -8,6 +8,7 @@ import { startOfWeek } from "date-fns";
 
 export default async function AppointmentsPage() {
   const session = await auth();
+  const businessId = session?.user.businessId!;
   const isManicurist = session?.user.role === "MANICURIST";
   const manicuristId = session?.user.manicuristId ?? undefined;
 
@@ -15,14 +16,14 @@ export default async function AppointmentsPage() {
   const initialWeekStartKey = weekStart.toISOString().slice(0, 10); // YYYY-MM-DD
 
   const [settings, appointments, allManicurists, services, clients] = await Promise.all([
-    getAppSettings(),
-    getAppointmentsByWeek(weekStart, isManicurist ? manicuristId : undefined),
+    getAppSettings(businessId),
+    getAppointmentsByWeek(weekStart, { businessId, manicuristId: isManicurist ? manicuristId : undefined }),
     prisma.manicurist.findMany({
-      where: { isActive: true },
+      where: { businessId, isActive: true },
       include: { user: { select: { id: true, name: true } }, schedules: true },
     }),
-    prisma.service.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
-    prisma.client.findMany({ orderBy: { name: "asc" }, take: 200 }),
+    prisma.service.findMany({ where: { businessId, isActive: true }, orderBy: { name: "asc" } }),
+    prisma.client.findMany({ where: { businessId }, orderBy: { name: "asc" }, take: 200 }),
   ]);
 
   const servicesForClient    = serializeServices(services);

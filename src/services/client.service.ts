@@ -3,15 +3,17 @@ import { normalisePhone, buildPaginationMeta } from "@/lib/utils";
 import type { CreateClientInput, UpdateClientInput, ClientWithHistory } from "@/types";
 import type { Client } from "@prisma/client";
 
-export async function createClient(input: CreateClientInput): Promise<Client> {
+export async function createClient(input: CreateClientInput, businessId: string): Promise<Client> {
   const phone = normalisePhone(input.phone);
 
-  const existing = await prisma.client.findUnique({ where: { phone } });
+  const existing = await prisma.client.findUnique({
+    where: { businessId_phone: { businessId, phone } },
+  });
   if (existing) throw new Error(`Ya existe un cliente con el teléfono ${phone}.`);
 
   const email = input.email?.trim() || null;
   return prisma.client.create({
-    data: { name: input.name, phone, email, notes: input.notes ?? undefined },
+    data: { businessId, name: input.name, phone, email, notes: input.notes ?? undefined },
   });
 }
 
@@ -49,17 +51,21 @@ export async function getClientById(id: string): Promise<ClientWithHistory | nul
 export async function searchClients(
   query: string,
   page = 1,
-  limit = 20
+  limit = 20,
+  businessId: string
 ) {
-  const where = query
-    ? {
-        OR: [
-          { name: { contains: query, mode: "insensitive" as const } },
-          { phone: { contains: query } },
-          { email: { contains: query, mode: "insensitive" as const } },
-        ],
-      }
-    : {};
+  const where = {
+    businessId,
+    ...(query
+      ? {
+          OR: [
+            { name: { contains: query, mode: "insensitive" as const } },
+            { phone: { contains: query } },
+            { email: { contains: query, mode: "insensitive" as const } },
+          ],
+        }
+      : {}),
+  };
 
   const [total, clients] = await prisma.$transaction([
     prisma.client.count({ where }),

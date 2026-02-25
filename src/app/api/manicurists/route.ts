@@ -30,9 +30,11 @@ const createSchema = z.object({
 export async function GET(_req: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json(apiError("Unauthorized"), { status: 401 });
+  const businessId = session.user.businessId;
+  if (!businessId) return NextResponse.json(apiError("No business context"), { status: 403 });
 
   const manicurists = await prisma.manicurist.findMany({
-    where: { isActive: true },
+    where: { businessId, isActive: true },
     include: {
       user: { select: { id: true, name: true, email: true, avatarUrl: true } },
       schedules: true,
@@ -46,9 +48,11 @@ export async function GET(_req: NextRequest) {
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json(apiError("Unauthorized"), { status: 401 });
-  if (session.user.role !== "ADMIN") {
+  if (session.user.role !== "ADMIN" && session.user.role !== "OWNER") {
     return NextResponse.json(apiError("Forbidden"), { status: 403 });
   }
+  const businessId = session.user.businessId;
+  if (!businessId) return NextResponse.json(apiError("No business context"), { status: 403 });
 
   const body = await req.json();
   const parsed = createSchema.safeParse(body);
@@ -72,6 +76,7 @@ export async function POST(req: NextRequest) {
       role: "MANICURIST",
       manicurist: {
         create: {
+          businessId,
           color,
           bio,
           ...(schedules && {

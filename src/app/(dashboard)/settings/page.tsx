@@ -6,9 +6,9 @@ import { getAppSettings } from "@/services/settings.service";
 
 export default async function SettingsPage() {
   const session = await auth();
-  if (session?.user.role !== "ADMIN") redirect("/dashboard");
-
-  const settings = await getAppSettings();
+  if (session?.user.role !== "ADMIN" && session?.user.role !== "OWNER") redirect("/dashboard");
+  const businessId = session?.user.businessId!;
+  const settings = await getAppSettings(businessId);
 
   return (
     <div className="space-y-10">

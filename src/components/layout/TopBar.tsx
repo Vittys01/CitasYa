@@ -15,7 +15,7 @@ export default function TopBar({ user, settings }: TopBarProps) {
   const pathname = usePathname();
   const roleLabel = settings[`role.${user.role}`] ?? user.role;
   const get = (k: string, fallback: string) => settings[k] ?? fallback;
-  const items = getNavItems(user.role as "ADMIN" | "MANICURIST" | "RECEPTIONIST");
+  const items = getNavItems(user.role as "OWNER" | "ADMIN" | "MANICURIST" | "RECEPTIONIST");
 
   return (
     <header className="h-14 bg-white border-b border-[#e6d5c3] flex items-center justify-between px-4 sm:px-6 shrink-0 z-10 gap-2">

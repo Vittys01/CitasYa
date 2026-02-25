@@ -6,20 +6,24 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("🌱 Seeding database...");
 
-  // Admin user
+  const business = await prisma.business.findFirst({ where: { slug: "default" } });
+  if (!business) {
+    throw new Error("No default business found. Run migrations first.");
+  }
+  const businessId = business.id;
+
   const adminPassword = await bcrypt.hash("admin123", 12);
   await prisma.user.upsert({
     where: { email: "admin@dates.app" },
-    update: {},
+    update: { password: adminPassword },
     create: {
       email: "admin@dates.app",
       password: adminPassword,
       name: "Admin",
-      role: Role.ADMIN,
+      role: Role.OWNER,
     },
   });
 
-  // Manicurist users
   const maniPass = await bcrypt.hash("mani123", 12);
 
   await prisma.user.upsert({
@@ -32,6 +36,7 @@ async function main() {
       role: Role.MANICURIST,
       manicurist: {
         create: {
+          businessId,
           color: "#ec4899",
           schedules: {
             createMany: {
@@ -57,6 +62,7 @@ async function main() {
       role: Role.MANICURIST,
       manicurist: {
         create: {
+          businessId,
           color: "#8b5cf6",
           schedules: {
             createMany: {
@@ -72,24 +78,23 @@ async function main() {
     },
   });
 
-  // Services
   await prisma.service.createMany({
     skipDuplicates: true,
     data: [
-      { name: "Manicura clásica",        duration: 45,  price: 3500,  color: "#f472b6" },
-      { name: "Manicura semipermanente",  duration: 60,  price: 5500,  color: "#c084fc" },
-      { name: "Pedicura clásica",         duration: 60,  price: 4000,  color: "#60a5fa" },
-      { name: "Pedicura semipermanente",  duration: 75,  price: 6000,  color: "#34d399" },
-      { name: "Uñas acrílicas",           duration: 120, price: 9500,  color: "#fb923c" },
-      { name: "Nail art (diseño simple)", duration: 30,  price: 1500,  color: "#fbbf24" },
+      { businessId, name: "Manicura clásica",        duration: 45,  price: 3500,  color: "#f472b6" },
+      { businessId, name: "Manicura semipermanente",  duration: 60,  price: 5500,  color: "#c084fc" },
+      { businessId, name: "Pedicura clásica",         duration: 60,  price: 4000,  color: "#60a5fa" },
+      { businessId, name: "Pedicura semipermanente",  duration: 75,  price: 6000,  color: "#34d399" },
+      { businessId, name: "Uñas acrílicas",           duration: 120, price: 9500,  color: "#fb923c" },
+      { businessId, name: "Nail art (diseño simple)", duration: 30,  price: 1500,  color: "#fbbf24" },
     ],
   });
 
-  // Sample client
   await prisma.client.upsert({
-    where: { phone: "+5491112345678" },
+    where: { businessId_phone: { businessId, phone: "+5491112345678" } },
     update: {},
     create: {
+      businessId,
       name: "María García",
       phone: "+5491112345678",
       email: "maria@example.com",
@@ -109,6 +114,7 @@ async function main() {
     { key: "nav.clients",      value: "Clientes" },
     { key: "nav.settings",     value: "Configuración" },
     // Roles
+    { key: "role.OWNER",        value: "Dueño" },
     { key: "role.ADMIN",        value: "Administradora" },
     { key: "role.MANICURIST",   value: "Manicurista" },
     { key: "role.RECEPTIONIST", value: "Recepcionista" },
@@ -287,9 +293,9 @@ async function main() {
 
   for (const { key, value } of defaultSettings) {
     await prisma.appSetting.upsert({
-      where:  { key },
+      where:  { businessId_key: { businessId, key } },
       update: { value },
-      create: { key, value },
+      create: { businessId, key, value },
     });
   }
 

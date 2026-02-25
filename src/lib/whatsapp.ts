@@ -30,10 +30,10 @@ class EvolutionProvider implements WhatsAppProvider {
   private readonly apiKey: string;
   private readonly instance: string;
 
-  constructor() {
+  constructor(instanceName?: string) {
     this.baseUrl = process.env.EVOLUTION_API_URL ?? "http://localhost:8080";
     this.apiKey = process.env.EVOLUTION_API_KEY ?? "";
-    this.instance = process.env.EVOLUTION_INSTANCE ?? "default";
+    this.instance = instanceName ?? process.env.EVOLUTION_INSTANCE ?? "default";
   }
 
   async sendText({ to, body }: WhatsAppMessage): Promise<WhatsAppSendResult> {
@@ -115,13 +115,18 @@ class MetaProvider implements WhatsAppProvider {
 
 // ─── Factory ──────────────────────────────────────────────────────────────────
 
-function createProvider(): WhatsAppProvider {
+function createProvider(instanceName?: string): WhatsAppProvider {
   const provider = process.env.WHATSAPP_PROVIDER ?? "evolution";
   if (provider === "meta") return new MetaProvider();
-  return new EvolutionProvider();
+  return new EvolutionProvider(instanceName);
 }
 
 export const whatsapp = createProvider();
+
+/** Provider for a given Evolution instance (e.g. per-business). Falls back to default env instance if no name. */
+export function getProviderForInstance(instanceName: string | null | undefined): WhatsAppProvider {
+  return createProvider(instanceName ?? undefined);
+}
 
 // ─── Message templates ────────────────────────────────────────────────────────
 

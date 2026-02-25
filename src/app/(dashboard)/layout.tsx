@@ -11,8 +11,10 @@ export default async function DashboardLayout({
 }) {
   const session = await auth();
   if (!session) redirect("/login");
+  const businessId = session.user.businessId;
+  if (!businessId) redirect("/dashboard?noBusiness=1");
 
-  const settings = await getAppSettings();
+  const settings = await getAppSettings(businessId);
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">

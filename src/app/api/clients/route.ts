@@ -24,19 +24,23 @@ const createSchema = z.object({
 export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json(apiError("Unauthorized"), { status: 401 });
+  const businessId = session.user.businessId;
+  if (!businessId) return NextResponse.json(apiError("No business context"), { status: 403 });
 
   const { searchParams } = req.nextUrl;
   const q = searchParams.get("q") ?? "";
   const page = parseInt(searchParams.get("page") ?? "1");
   const limit = parseInt(searchParams.get("limit") ?? "20");
 
-  const result = await searchClients(q, page, limit);
+  const result = await searchClients(q, page, limit, businessId);
   return NextResponse.json({ success: true, ...result });
 }
 
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json(apiError("Unauthorized"), { status: 401 });
+  const businessId = session.user.businessId;
+  if (!businessId) return NextResponse.json(apiError("No business context"), { status: 403 });
 
   const body = await req.json();
   const parsed = createSchema.safeParse(body);
@@ -45,7 +49,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const client = await createClient(parsed.data);
+    const client = await createClient(parsed.data, businessId);
     return NextResponse.json(apiSuccess(client), { status: 201 });
   } catch (err) {
     return NextResponse.json(apiError(String(err), "CONFLICT"), { status: 409 });

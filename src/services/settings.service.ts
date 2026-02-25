@@ -1,11 +1,11 @@
 import { prisma } from "@/lib/db";
 
-/** All app labels/config key-value map from DB. Use in server components and pass to client as needed. */
-export async function getAppSettings(): Promise<Record<string, string>> {
-  if (!prisma.appSetting) {
-    return {};
-  }
-  const rows = await prisma.appSetting.findMany({ select: { key: true, value: true } });
+/** All app labels/config key-value map from DB for a business. */
+export async function getAppSettings(businessId: string): Promise<Record<string, string>> {
+  const rows = await prisma.appSetting.findMany({
+    where: { businessId },
+    select: { key: true, value: true },
+  });
   return Object.fromEntries(rows.map((r) => [r.key, r.value]));
 }
 

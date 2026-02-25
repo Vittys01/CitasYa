@@ -1,14 +1,27 @@
 import { Queue, Worker, Job } from "bullmq";
-import IORedis from "ioredis";
 
-/** Creates a fresh Redis connection. BullMQ requires dedicated connections per queue/worker. */
+/** Parses REDIS_URL into a plain options object.
+ *  BullMQ uses its own bundled ioredis, so passing an external IORedis instance
+ *  causes a type conflict. Plain options are always safe. */
 export function makeRedisConnection() {
-  return new IORedis(process.env.REDIS_URL ?? "redis://localhost:6379", {
-    maxRetriesPerRequest: null,
-  });
+  const raw = process.env.REDIS_URL ?? "redis://localhost:6379";
+  try {
+    const u = new URL(raw);
+    return {
+      host: u.hostname || "localhost",
+      port: u.port ? parseInt(u.port, 10) : 6379,
+      password: u.password || undefined,
+      maxRetriesPerRequest: null as null,
+    };
+  } catch {
+    return {
+      host: "localhost",
+      port: 6379,
+      maxRetriesPerRequest: null as null,
+    };
+  }
 }
 
-// Keep a shared connection for legacy imports
 const connection = makeRedisConnection();
 
 // ─── Queue names ─────────────────────────────────────────────────────────────

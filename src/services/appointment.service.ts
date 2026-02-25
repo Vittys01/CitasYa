@@ -137,6 +137,7 @@ export async function createAppointment(
 
   const appointment = await prisma.appointment.create({
     data: {
+      businessId: service.businessId,
       clientId: input.clientId,
       manicuristId: input.manicuristId,
       serviceId: input.serviceId,
@@ -223,7 +224,7 @@ export async function cancelAppointment(id: string): Promise<void> {
 
 export async function getAppointmentsByDate(
   date: Date,
-  manicuristId?: string
+  options?: { manicuristId?: string; businessId?: string }
 ): Promise<AppointmentWithRelations[]> {
   const start = new Date(date);
   start.setHours(0, 0, 0, 0);
@@ -233,7 +234,8 @@ export async function getAppointmentsByDate(
   const rows = await prisma.appointment.findMany({
     where: {
       startAt: { gte: start, lte: end },
-      ...(manicuristId ? { manicuristId } : {}),
+      ...(options?.businessId ? { businessId: options.businessId } : {}),
+      ...(options?.manicuristId ? { manicuristId: options.manicuristId } : {}),
     },
     include: appointmentInclude,
     orderBy: { startAt: "asc" },
@@ -244,7 +246,7 @@ export async function getAppointmentsByDate(
 
 export async function getAppointmentsByWeek(
   weekStart: Date,
-  manicuristId?: string
+  options?: { manicuristId?: string; businessId?: string }
 ): Promise<AppointmentWithRelations[]> {
   const end = new Date(weekStart);
   end.setDate(end.getDate() + 7);
@@ -252,7 +254,8 @@ export async function getAppointmentsByWeek(
   const rows = await prisma.appointment.findMany({
     where: {
       startAt: { gte: weekStart, lt: end },
-      ...(manicuristId ? { manicuristId } : {}),
+      ...(options?.businessId ? { businessId: options.businessId } : {}),
+      ...(options?.manicuristId ? { manicuristId: options.manicuristId } : {}),
     },
     include: appointmentInclude,
     orderBy: { startAt: "asc" },
@@ -329,11 +332,12 @@ export async function getAvailableSlots(
   return slots;
 }
 
-/** Next N available slots from now (no past). If manicuristIds is empty, uses all active manicurists. */
+/** Next N available slots from now (no past). If manicuristIds is empty, uses all active manicurists (optionally for businessId). */
 export async function getNextAvailableSlots(
   manicuristIds: string[],
   serviceDuration: number,
-  limit: number
+  limit: number,
+  businessId?: string
 ): Promise<{ start: Date; end: Date; manicuristId: string }[]> {
   const now = new Date();
   const mins = now.getMinutes();
@@ -346,7 +350,10 @@ export async function getNextAvailableSlots(
   const ids =
     manicuristIds.length > 0
       ? manicuristIds
-      : (await prisma.manicurist.findMany({ where: { isActive: true }, select: { id: true } })).map((m) => m.id);
+      : (await prisma.manicurist.findMany({
+          where: { isActive: true, ...(businessId ? { businessId } : {}) },
+          select: { id: true },
+        })).map((m) => m.id);
 
   const collected: { start: Date; end: Date; manicuristId: string }[] = [];
   const maxDays = 14;

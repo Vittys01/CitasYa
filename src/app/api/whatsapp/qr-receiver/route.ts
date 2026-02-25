@@ -10,8 +10,8 @@ import IORedis from "ioredis";
 
 const REDIS_URL = process.env.REDIS_URL ?? "redis://localhost:6379";
 const INSTANCE = process.env.EVOLUTION_INSTANCE ?? "dates-instance";
-export const QR_REDIS_KEY = `whatsapp:qr:${INSTANCE}`;
-export const QR_TTL_SECONDS = 60;
+const QR_REDIS_KEY = `whatsapp:qr:${INSTANCE}`;
+const QR_TTL_SECONDS = 60;
 
 let redis: IORedis | null = null;
 

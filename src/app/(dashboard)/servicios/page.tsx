@@ -8,11 +8,12 @@ import { getAppSettings } from "@/services/settings.service";
 export default async function ServiciosPage() {
   const session = await auth();
   if (!session) redirect("/login");
-  if (session.user.role !== "ADMIN") redirect("/dashboard");
+  if (session.user.role !== "ADMIN" && session.user.role !== "OWNER") redirect("/dashboard");
+  const businessId = session.user.businessId!;
 
   const [settings, services] = await Promise.all([
-    getAppSettings(),
-    prisma.service.findMany({ orderBy: { name: "asc" } }),
+    getAppSettings(businessId),
+    prisma.service.findMany({ where: { businessId }, orderBy: { name: "asc" } }),
   ]);
 
   const servicesForClient = serializeServices(services);

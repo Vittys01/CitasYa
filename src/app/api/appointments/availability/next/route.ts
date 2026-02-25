@@ -14,6 +14,8 @@ export async function GET(req: NextRequest) {
   try {
     const session = await auth();
     if (!session) return NextResponse.json(apiError("Unauthorized"), { status: 401 });
+    const businessId = session.user.businessId;
+    if (!businessId) return NextResponse.json(apiError("No business context"), { status: 403 });
 
     const { searchParams } = req.nextUrl;
     const serviceId = searchParams.get("serviceId");
@@ -29,6 +31,9 @@ export async function GET(req: NextRequest) {
     if (!service) {
       return NextResponse.json(apiError("Servicio no encontrado"), { status: 404 });
     }
+    if (service.businessId !== businessId) {
+      return NextResponse.json(apiError("Servicio no pertenece a tu empresa"), { status: 403 });
+    }
 
     const duration = Number(service.duration);
     if (!Number.isFinite(duration) || duration < 1) {
@@ -36,7 +41,7 @@ export async function GET(req: NextRequest) {
     }
 
     const manicuristIds = manicuristId ? [manicuristId] : [];
-    const slots = await getNextAvailableSlots(manicuristIds, duration, limit);
+    const slots = await getNextAvailableSlots(manicuristIds, duration, limit, businessId);
 
     const manicuristIdsSeen = [...new Set(slots.map((s) => s.manicuristId))];
     const manicurists =

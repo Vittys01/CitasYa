@@ -6,9 +6,9 @@ import WhatsAppPageContent from "./WhatsAppPageContent";
 export default async function WhatsAppPage() {
   const session = await auth();
   if (!session) redirect("/login");
-  if (session.user.role !== "ADMIN") redirect("/dashboard");
-
-  const settings = await getAppSettings();
+  if (session.user.role !== "ADMIN" && session.user.role !== "OWNER") redirect("/dashboard");
+  const businessId = session.user.businessId!;
+  const settings = await getAppSettings(businessId);
   const evolutionManagerUrl =
     process.env.EVOLUTION_API_URL &&
     process.env.WHATSAPP_PROVIDER === "evolution"

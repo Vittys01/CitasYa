@@ -12,7 +12,7 @@ export const navKeys = [
 
 export function getNavItems(role: Role) {
   return navKeys.filter((item) => {
-    if (item.adminOnly && role !== "ADMIN") return false;
+    if (item.adminOnly && role !== "ADMIN" && role !== "OWNER") return false;
     if (item.hideForManicurist && role === "MANICURIST") return false;
     return true;
   });

@@ -12,11 +12,12 @@ export default async function ClientsPage({
 }) {
   const session = await auth();
   if (session?.user.role === "MANICURIST") redirect("/appointments");
+  const businessId = session?.user.businessId!;
 
   const params = await searchParams;
   const [settings, { clients, meta }] = await Promise.all([
-    getAppSettings(),
-    searchClients(params.q ?? "", parseInt(params.page ?? "1"), 20),
+    getAppSettings(businessId),
+    searchClients(params.q ?? "", parseInt(params.page ?? "1"), 20, businessId),
   ]);
 
   return (
