@@ -8,6 +8,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import IORedis from "ioredis";
 
+export const runtime = "nodejs";
+
 const REDIS_URL = process.env.REDIS_URL ?? "redis://localhost:6379";
 const INSTANCE = process.env.EVOLUTION_INSTANCE ?? "dates-instance";
 const QR_REDIS_KEY = `whatsapp:qr:${INSTANCE}`;
