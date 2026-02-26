@@ -1,15 +1,15 @@
 # ─── Shared environment ───────────────────────────────────────────────────────
 x-app-env: &app-env
-  DATABASE_URL:            postgresql://dates_user:dates_pass@postgres:5432/dates_db
-  REDIS_URL:               redis://redis:6379
-  AUTH_SECRET:             change-me-in-production-min-32-chars
-  NEXT_PUBLIC_APP_URL:     http://localhost:3000
-  AUTH_URL:                http://localhost:3000
-  WHATSAPP_PROVIDER:       evolution
-  EVOLUTION_API_URL:       http://evolution:8080
-  EVOLUTION_API_KEY:       evolution_secret
-  EVOLUTION_INSTANCE:      dates-instance
-  REMINDER_HOURS_BEFORE:   "24"
+  DATABASE_URL:            ${DATABASE_URL:-postgresql://dates_user:dates_pass@postgres:5432/dates_db}
+  REDIS_URL:               ${REDIS_URL:-redis://redis:6379}
+  AUTH_SECRET:             ${AUTH_SECRET:-change-me-in-production-min-32-chars}
+  NEXT_PUBLIC_APP_URL:     ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+  AUTH_URL:                ${AUTH_URL:-http://localhost:3000}
+  WHATSAPP_PROVIDER:       ${WHATSAPP_PROVIDER:-evolution}
+  EVOLUTION_API_URL:       ${EVOLUTION_API_URL:-http://evolution:8080}
+  EVOLUTION_API_KEY:       ${EVOLUTION_API_KEY:-evolution_secret}
+  EVOLUTION_INSTANCE:      ${EVOLUTION_INSTANCE:-dates-instance}
+  REMINDER_HOURS_BEFORE:   ${REMINDER_HOURS_BEFORE:-24}
 
 services:
 
