@@ -16,8 +16,8 @@ build/
 .env.test.local
 .env.production.local
 
-# Prisma
-prisma/migrations/
+# Prisma (migrations must be committed for production deploys)
+# prisma/migrations/
 
 # Debug
 npm-debug.log*
