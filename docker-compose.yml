@@ -4,6 +4,7 @@ x-app-env: &app-env
   REDIS_URL:               redis://redis:6379
   AUTH_SECRET:             change-me-in-production-min-32-chars
   NEXT_PUBLIC_APP_URL:     http://localhost:3000
+  AUTH_URL:                http://localhost:3000
   WHATSAPP_PROVIDER:       evolution
   EVOLUTION_API_URL:       http://evolution:8080
   EVOLUTION_API_KEY:       evolution_secret

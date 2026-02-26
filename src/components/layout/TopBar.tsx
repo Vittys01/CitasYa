@@ -57,7 +57,7 @@ export default function TopBar({ user, settings }: TopBarProps) {
         </div>
 
         <button
-          onClick={() => signOut({ callbackUrl: "/login" })}
+          onClick={() => signOut({ callbackUrl: `${window.location.origin}/login` })}
           title={settings["action.signOut"] ?? "Cerrar sesión"}
           className="p-2 text-[#bda696] hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
         >
