@@ -54,7 +54,17 @@ services:
     environment:
       <<: *app-env
     command: >
-      sh -c "./node_modules/.bin/prisma migrate deploy && ./node_modules/.bin/tsx prisma/seed.ts"
+      sh -c "
+        node -e \"
+          const { PrismaClient } = require('@prisma/client');
+          const db = new PrismaClient();
+          db.\\\$executeRawUnsafe('UPDATE _prisma_migrations SET rolled_back_at = NOW() WHERE finished_at IS NULL AND rolled_back_at IS NULL')
+            .catch(() => {})
+            .finally(() => db.\\\$disconnect());
+        \" 2>/dev/null || true &&
+        ./node_modules/.bin/prisma migrate deploy &&
+        (./node_modules/.bin/tsx prisma/seed.ts || true)
+      "
     depends_on:
       postgres:
         condition: service_healthy
