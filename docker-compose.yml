@@ -23,8 +23,7 @@ services:
       POSTGRES_DB:       dates_db
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+    # No public ports — only accessible within Docker network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U dates_user -d dates_db"]
       interval: 10s
@@ -38,8 +37,7 @@ services:
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
-    ports:
-      - "6379:6379"
+    # No public ports — only accessible within Docker network
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -128,8 +126,7 @@ services:
       CACHE_REDIS_URI:           redis://redis:6379
     volumes:
       - evolution_data:/evolution/instances
-    ports:
-      - "8080:8080"
+    # No public ports — app connects via internal Docker network as http://evolution:8080
     depends_on:
       postgres:
         condition: service_healthy
