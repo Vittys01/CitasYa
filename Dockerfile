@@ -6,7 +6,17 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm ci
 
-# ─── Stage 2: Builder ─────────────────────────────────────────────────────────
+# ─── Stage 2: Migrator (Prisma only, no Next.js build) ────────────────────────
+FROM node:20-alpine AS migrator
+RUN apk add --no-cache openssl
+WORKDIR /app
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+RUN ./node_modules/.bin/prisma generate
+
+# ─── Stage 3: Builder ─────────────────────────────────────────────────────────
 FROM node:20-alpine AS builder
 RUN apk add --no-cache openssl
 WORKDIR /app

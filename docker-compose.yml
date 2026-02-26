@@ -48,7 +48,7 @@ services:
   migrate:
     build:
       context: .
-      target: builder
+      target: migrator
     environment:
       <<: *app-env
     command: >
