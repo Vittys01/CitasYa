@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import { redirect } from "next/navigation";
 import { getDashboardStats, getManicuristProductivity } from "@/services/dashboard.service";
 import { getAppointmentsByDate } from "@/services/appointment.service";
 import { getAppSettings } from "@/services/settings.service";
@@ -9,7 +10,8 @@ import TodayAppointments from "@/components/dashboard/TodayAppointments";
 
 export default async function DashboardPage() {
   const session = await auth();
-  const businessId = session?.user.businessId!;
+  const businessId = session?.user.businessId;
+  if (!businessId) redirect("/login?noBusiness=1");
   const isManicurist = session?.user.role === "MANICURIST";
   const manicuristId = session?.user.manicuristId ?? undefined;
 

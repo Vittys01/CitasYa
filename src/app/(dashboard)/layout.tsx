@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import Sidebar from "@/components/layout/Sidebar";
 import TopBar from "@/components/layout/TopBar";
 import { getAppSettings } from "@/services/settings.service";
+import { prisma } from "@/lib/db";
 
 export default async function DashboardLayout({
   children,
@@ -11,8 +12,20 @@ export default async function DashboardLayout({
 }) {
   const session = await auth();
   if (!session) redirect("/login");
-  const businessId = session.user.businessId;
-  if (!businessId) redirect("/dashboard?noBusiness=1");
+
+  // Try session businessId first; for OWNER whose JWT was issued before the
+  // business was created, look it up fresh from the DB.
+  let businessId = session.user.businessId ?? null;
+  if (!businessId && session.user.role === "OWNER") {
+    const biz = await prisma.business.findFirst({
+      where: { ownerId: session.user.id },
+      select: { id: true },
+    });
+    businessId = biz?.id ?? null;
+  }
+
+  // Redirect outside the dashboard layout to avoid infinite loops
+  if (!businessId) redirect("/login?noBusiness=1");
 
   const settings = await getAppSettings(businessId);
 
