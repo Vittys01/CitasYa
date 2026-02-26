@@ -51,8 +51,8 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   const session = await auth();
   if (!session) return NextResponse.json(apiError("Unauthorized"), { status: 401 });
 
-  // Only admins can delete clients
-  if (session.user.role !== "ADMIN") {
+  // Only admins/owners can delete clients
+  if (session.user.role !== "ADMIN" && session.user.role !== "OWNER") {
     return NextResponse.json(apiError("Forbidden", "FORBIDDEN"), { status: 403 });
   }
 

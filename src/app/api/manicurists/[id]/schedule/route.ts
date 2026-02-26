@@ -36,6 +36,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
   if (
     session.user.role !== "ADMIN" &&
+    session.user.role !== "OWNER" &&
     session.user.id !== manicurist.userId
   ) {
     return NextResponse.json(apiError("Forbidden"), { status: 403 });
