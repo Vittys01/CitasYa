@@ -16,6 +16,18 @@ export default auth((req) => {
     return NextResponse.redirect(loginUrl);
   }
 
+  const role = req.auth?.user?.role;
+
+  // OWNER trying to access /dashboard → send them to /owner
+  if (role === "OWNER" && pathname.startsWith("/dashboard")) {
+    return NextResponse.redirect(new URL("/owner", req.url));
+  }
+
+  // Non-OWNER trying to access /owner → send them to /dashboard
+  if (role && role !== "OWNER" && pathname.startsWith("/owner")) {
+    return NextResponse.redirect(new URL("/dashboard", req.url));
+  }
+
   return NextResponse.next();
 });
 

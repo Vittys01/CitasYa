@@ -15,6 +15,7 @@ export default async function EquipoPage() {
     prisma.user.findMany({
       where: {
         isActive: true,
+        role: { not: "OWNER" },
         OR: [
           { businessId },
           { manicurist: { businessId } },

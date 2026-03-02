@@ -33,6 +33,13 @@ interface Props {
   renderTrigger?: boolean;
 }
 
+type NewClientForm = {
+  name: string;
+  phone: string;
+  email: string;
+  notes: string;
+};
+
 const g = (s: Record<string, string> | undefined, k: string, fb: string) => (s && s[k]) ?? fb;
 
 const schema = z.object({
@@ -63,6 +70,17 @@ export default function NewAppointmentButton({
   const [internalOpen, setInternalOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+
+  // ── Local client list (starts from prop, grows with inline creates) ──────────
+  const [clientsList, setClientsList] = useState<Client[]>(clients);
+  // Sync if parent re-renders with updated clients (e.g. server refresh)
+  useEffect(() => { setClientsList(clients); }, [clients]);
+
+  // ── New-client inline form ────────────────────────────────────────────────────
+  const [showNewClient, setShowNewClient] = useState(false);
+  const [newClient, setNewClient] = useState<NewClientForm>({ name: "", phone: "", email: "", notes: "" });
+  const [newClientLoading, setNewClientLoading] = useState(false);
+  const [newClientError, setNewClientError] = useState("");
 
   const isControlled = controlledOpen !== undefined && controlledOnClose !== undefined;
   const open = isControlled ? controlledOpen : internalOpen;
@@ -191,11 +209,46 @@ export default function NewAppointmentButton({
     setPickerDate("");
     setSlotOptions([]);
     setError(null);
+    setShowNewClient(false);
+    setNewClient({ name: "", phone: "", email: "", notes: "" });
+    setNewClientError("");
     if (!isControlled) setInternalOpen(true);
   }
 
   function closeDrawer() {
     if (isControlled) controlledOnClose?.(); else setInternalOpen(false);
+  }
+
+  async function handleCreateClient(e: React.FormEvent) {
+    e.preventDefault();
+    setNewClientError("");
+    setNewClientLoading(true);
+    try {
+      const res = await fetch("/api/clients", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newClient.name.trim(),
+          phone: newClient.phone.trim(),
+          email: newClient.email.trim() || undefined,
+          notes: newClient.notes.trim() || undefined,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setNewClientError(json?.error?.message ?? "Error al crear el cliente");
+        return;
+      }
+      const created: Client = json.data;
+      setClientsList((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+      setValue("clientId", created.id, { shouldValidate: true });
+      setShowNewClient(false);
+      setNewClient({ name: "", phone: "", email: "", notes: "" });
+    } catch {
+      setNewClientError("Error de conexión");
+    } finally {
+      setNewClientLoading(false);
+    }
   }
 
   // When controlled open becomes true with initialPrefill, apply prefill
@@ -303,16 +356,131 @@ export default function NewAppointmentButton({
                   <span className="material-symbols-outlined text-[14px]">person</span>
                   {g(settings, "form.section.clientData", "Datos del cliente")}
                 </h3>
-                <div>
-                  <label className={labelCls}>{g(settings, "form.clientLabel", "Cliente")}</label>
-                  <select {...register("clientId")} className={inputCls}>
-                    <option value="">{g(settings, "form.selectClient", "Seleccionar cliente...")}</option>
-                    {clients.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name} — {c.phone}</option>
-                    ))}
-                  </select>
-                  {errors.clientId && <p className="text-red-500 text-xs mt-1">{g(settings, "validation.selectClient", "Seleccioná un cliente")}</p>}
-                </div>
+
+                {/* Existing client selector */}
+                {!showNewClient && (
+                  <div className="space-y-2">
+                    <label className={labelCls}>{g(settings, "form.clientLabel", "Cliente")}</label>
+                    <select {...register("clientId")} className={inputCls}>
+                      <option value="">{g(settings, "form.selectClient", "Seleccionar cliente...")}</option>
+                      {clientsList.map((c) => (
+                        <option key={c.id} value={c.id}>{c.name} — {c.phone}</option>
+                      ))}
+                    </select>
+                    {errors.clientId && (
+                      <p className="text-red-500 text-xs mt-1">
+                        {g(settings, "validation.selectClient", "Seleccioná un cliente")}
+                      </p>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setShowNewClient(true)}
+                      className="flex items-center gap-1.5 text-xs text-primary-dark hover:text-primary font-semibold mt-1 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">person_add</span>
+                      Crear cliente nuevo
+                    </button>
+                  </div>
+                )}
+
+                {/* Inline new-client form */}
+                {showNewClient && (
+                  <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-xs font-bold text-primary-dark flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-[14px]">person_add</span>
+                        Nuevo cliente
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => { setShowNewClient(false); setNewClientError(""); }}
+                        className="text-[#bda696] hover:text-earth transition"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">close</span>
+                      </button>
+                    </div>
+
+                    {newClientError && (
+                      <p className="text-red-600 text-xs bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-[14px] shrink-0">error</span>
+                        {newClientError}
+                      </p>
+                    )}
+
+                    <form onSubmit={handleCreateClient} className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className={labelCls}>Nombre <span className="text-red-500">*</span></label>
+                          <input
+                            type="text"
+                            value={newClient.name}
+                            onChange={(e) => setNewClient((p) => ({ ...p, name: e.target.value }))}
+                            placeholder="Nombre completo"
+                            required
+                            className={inputCls}
+                          />
+                        </div>
+                        <div>
+                          <label className={labelCls}>Teléfono <span className="text-red-500">*</span></label>
+                          <input
+                            type="tel"
+                            value={newClient.phone}
+                            onChange={(e) => setNewClient((p) => ({ ...p, phone: e.target.value }))}
+                            placeholder="549XXXXXXXXXX"
+                            required
+                            className={inputCls}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className={labelCls}>Email <span className="text-xs text-earth-muted font-normal">(opcional)</span></label>
+                        <input
+                          type="email"
+                          value={newClient.email}
+                          onChange={(e) => setNewClient((p) => ({ ...p, email: e.target.value }))}
+                          placeholder="cliente@email.com"
+                          className={inputCls}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Notas <span className="text-xs text-earth-muted font-normal">(opcional)</span></label>
+                        <input
+                          type="text"
+                          value={newClient.notes}
+                          onChange={(e) => setNewClient((p) => ({ ...p, notes: e.target.value }))}
+                          placeholder="Ej: alergia a ciertos productos"
+                          className={inputCls}
+                        />
+                      </div>
+                      <div className="flex items-center gap-2 pt-1">
+                        <button
+                          type="submit"
+                          disabled={newClientLoading}
+                          className="flex-1 px-4 py-2 text-sm font-bold bg-primary-dark text-white rounded-lg hover:bg-primary-hover disabled:opacity-60 transition flex items-center justify-center gap-1.5"
+                        >
+                          {newClientLoading ? (
+                            <>
+                              <span className="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>
+                              Creando...
+                            </>
+                          ) : (
+                            <>
+                              <span className="material-symbols-outlined text-[14px]">check</span>
+                              Crear y seleccionar
+                            </>
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setShowNewClient(false); setNewClientError(""); }}
+                          className="px-3 py-2 text-sm text-earth border border-[#D7CCC8] rounded-lg hover:bg-cream-dark bg-white transition"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                )}
               </div>
 
               {/* Service */}

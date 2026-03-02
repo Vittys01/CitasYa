@@ -56,6 +56,9 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     include: { manicurist: true },
   });
   if (!user) return NextResponse.json(apiError("Usuario no encontrado"), { status: 404 });
+  if (user.role === "OWNER") {
+    return NextResponse.json(apiError("No se puede eliminar al owner"), { status: 403 });
+  }
 
   const hasAppointments =
     user.manicurist &&

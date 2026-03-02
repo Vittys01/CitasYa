@@ -4,36 +4,75 @@ import bcrypt from "bcryptjs";
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log("🌱 Seeding database...");
+  console.log("🧹 Limpiando base de datos...");
 
-  const business = await prisma.business.findFirst({ where: { slug: "default" } });
-  if (!business) {
-    throw new Error("No default business found. Run migrations first.");
-  }
-  const businessId = business.id;
+  // Delete in dependency order
+  await prisma.notification.deleteMany();
+  await prisma.appointment.deleteMany();
+  await prisma.client.deleteMany();
+  await prisma.schedule.deleteMany();
+  await prisma.manicurist.deleteMany();
+  await prisma.service.deleteMany();
+  await prisma.appSetting.deleteMany();
+  await prisma.user.deleteMany();
+  await prisma.business.deleteMany();
 
-  const adminPassword = await bcrypt.hash("admin123", 12);
-  await prisma.user.upsert({
-    where: { email: "admin@dates.app" },
-    update: { password: adminPassword },
-    create: {
-      email: "admin@dates.app",
-      password: adminPassword,
-      name: "Admin",
+  console.log("✅ Base de datos limpia");
+  console.log("🌱 Sembrando datos...");
+
+  // ── OWNER ──────────────────────────────────────────────────────────────────
+  const ownerPassword = await bcrypt.hash("123vittyS", 12);
+  const owner = await prisma.user.create({
+    data: {
+      email: "bvittys@gmail.com",
+      password: ownerPassword,
+      name: "Vittys",
       role: Role.OWNER,
+      isActive: true,
     },
   });
 
-  const maniPass = await bcrypt.hash("mani123", 12);
+  // ── BUSINESS: Montecatini ──────────────────────────────────────────────────
+  const business = await prisma.business.create({
+    data: {
+      name: "Montecatini",
+      slug: "montecatini",
+      ownerId: owner.id,
+      isActive: true,
+    },
+  });
+  const businessId = business.id;
 
-  await prisma.user.upsert({
-    where: { email: "sofia@dates.app" },
-    update: {},
-    create: {
-      email: "sofia@dates.app",
-      password: maniPass,
-      name: "Sofía Romero",
+  // Link owner to business
+  await prisma.user.update({
+    where: { id: owner.id },
+    data: { businessId },
+  });
+
+  // ── ADMIN: Paola López ─────────────────────────────────────────────────────
+  const adminPassword = await bcrypt.hash("Montecatini123", 12);
+  await prisma.user.create({
+    data: {
+      email: "paolalopez@gmail.com",
+      password: adminPassword,
+      name: "Paola López",
+      role: Role.ADMIN,
+      businessId,
+      isActive: true,
+    },
+  });
+
+  // ── MANICURISTS ────────────────────────────────────────────────────────────
+  const maniPassword = await bcrypt.hash("123mani", 12);
+
+  await prisma.user.create({
+    data: {
+      email: "mafe@gmail.com",
+      password: maniPassword,
+      name: "Mafe",
       role: Role.MANICURIST,
+      businessId,
+      isActive: true,
       manicurist: {
         create: {
           businessId,
@@ -52,14 +91,14 @@ async function main() {
     },
   });
 
-  await prisma.user.upsert({
-    where: { email: "valentina@dates.app" },
-    update: {},
-    create: {
-      email: "valentina@dates.app",
-      password: maniPass,
-      name: "Valentina López",
+  await prisma.user.create({
+    data: {
+      email: "paola@gmail.com",
+      password: maniPassword,
+      name: "Paola",
       role: Role.MANICURIST,
+      businessId,
+      isActive: true,
       manicurist: {
         create: {
           businessId,
@@ -78,47 +117,31 @@ async function main() {
     },
   });
 
+  // ── SERVICES ───────────────────────────────────────────────────────────────
   await prisma.service.createMany({
-    skipDuplicates: true,
     data: [
-      { businessId, name: "Manicura clásica",        duration: 45,  price: 3500,  color: "#f472b6" },
-      { businessId, name: "Manicura semipermanente",  duration: 60,  price: 5500,  color: "#c084fc" },
-      { businessId, name: "Pedicura clásica",         duration: 60,  price: 4000,  color: "#60a5fa" },
-      { businessId, name: "Pedicura semipermanente",  duration: 75,  price: 6000,  color: "#34d399" },
-      { businessId, name: "Uñas acrílicas",           duration: 120, price: 9500,  color: "#fb923c" },
-      { businessId, name: "Nail art (diseño simple)", duration: 30,  price: 1500,  color: "#fbbf24" },
+      { businessId, name: "Manicura clásica",         duration: 45,  price: 3500,  color: "#f472b6" },
+      { businessId, name: "Manicura semipermanente",   duration: 60,  price: 5500,  color: "#c084fc" },
+      { businessId, name: "Pedicura clásica",          duration: 60,  price: 4000,  color: "#60a5fa" },
+      { businessId, name: "Pedicura semipermanente",   duration: 75,  price: 6000,  color: "#34d399" },
+      { businessId, name: "Uñas acrílicas",            duration: 120, price: 9500,  color: "#fb923c" },
+      { businessId, name: "Nail art (diseño simple)",  duration: 30,  price: 1500,  color: "#fbbf24" },
     ],
   });
 
-  await prisma.client.upsert({
-    where: { businessId_phone: { businessId, phone: "+5491112345678" } },
-    update: {},
-    create: {
-      businessId,
-      name: "María García",
-      phone: "+5491112345678",
-      email: "maria@example.com",
-      notes: "Alergia a acrílico marca X",
-    },
-  });
-
-  // ── App settings (ALL labels/copy – editable from Prisma Studio or a settings UI) ──
+  // ── APP SETTINGS ───────────────────────────────────────────────────────────
   const defaultSettings: Array<{ key: string; value: string }> = [
-    // App
-    { key: "app.name",    value: "Dates" },
+    { key: "app.name",    value: "Montecatini" },
     { key: "app.tagline", value: "Gestión de turnos" },
     { key: "app.version", value: "v1.0" },
-    // Navigation
     { key: "nav.dashboard",    value: "Dashboard" },
     { key: "nav.appointments", value: "Agenda" },
     { key: "nav.clients",      value: "Clientes" },
     { key: "nav.settings",     value: "Configuración" },
-    // Roles
     { key: "role.OWNER",        value: "Dueño" },
     { key: "role.ADMIN",        value: "Administradora" },
     { key: "role.MANICURIST",   value: "Manicurista" },
     { key: "role.RECEPTIONIST", value: "Recepcionista" },
-    // Sections
     { key: "section.services",    value: "Catálogo de servicios" },
     { key: "section.servicesSub", value: "servicios registrados" },
     { key: "section.addService",  value: "Agregar servicio" },
@@ -134,12 +157,10 @@ async function main() {
     { key: "confirm.cancelAppointment", value: "¿Cancelar este turno?" },
     { key: "common.cancelling",   value: "Cancelando..." },
     { key: "action.cancelAppointment",  value: "Cancelar turno" },
-    // Statuses
     { key: "status.PENDING",   value: "Pendiente" },
     { key: "status.CONFIRMED", value: "Confirmado" },
     { key: "status.CANCELLED", value: "Cancelado" },
     { key: "status.COMPLETED", value: "Completado" },
-    // Common
     { key: "common.active",   value: "Activo" },
     { key: "common.archived", value: "Archivado" },
     { key: "common.minutes",  value: "min" },
@@ -147,7 +168,6 @@ async function main() {
     { key: "common.saved",    value: "Guardado" },
     { key: "common.cancel",   value: "Cancelar" },
     { key: "common.save",     value: "Guardar" },
-    // Actions
     { key: "action.newAppointment",   value: "Nuevo turno" },
     { key: "action.saveAppointment",  value: "Guardar turno" },
     { key: "action.newClient",        value: "Nuevo cliente" },
@@ -162,12 +182,10 @@ async function main() {
     { key: "confirm.deleteService.body",  value: "Vas a eliminar permanentemente" },
     { key: "confirm.deleteService.warn",  value: "Esta acción no se puede deshacer." },
     { key: "action.signOut",          value: "Cerrar sesión" },
-    // Dashboard
     { key: "dashboard.welcome",    value: "Bienvenida" },
     { key: "dashboard.todayTitle", value: "Turnos de hoy" },
     { key: "dashboard.todaySub",   value: "activos" },
     { key: "dashboard.noAppts",    value: "Sin turnos para hoy" },
-    // Stats cards
     { key: "stats.todayLabel",           value: "Turnos hoy" },
     { key: "stats.completedLabel",       value: "Completados hoy" },
     { key: "stats.revenueDayLabel",      value: "Ingresos del día" },
@@ -177,20 +195,17 @@ async function main() {
     { key: "stats.finishedSub",          value: "servicios finalizados" },
     { key: "stats.fromCompletedSub",     value: "de turnos completados" },
     { key: "stats.appointmentsInPeriod", value: "turnos en el período" },
-    // Productivity chart
     { key: "chart.productivity.title",    value: "Productividad" },
     { key: "chart.productivity.subtitle", value: "Ingresos por profesional (mes actual)" },
     { key: "chart.tooltip.revenue",       value: "Ingresos" },
     { key: "chart.legend.appointments",   value: "turnos" },
     { key: "chart.empty",                 value: "Sin datos en el período" },
-    // Pages
     { key: "page.appointmentsTitle", value: "Agenda" },
     { key: "page.appointmentsSub",   value: "Vista semanal de todos los turnos" },
     { key: "page.clientsTitle",      value: "Clientes" },
     { key: "page.clientsSub",        value: "clientes registrados" },
     { key: "page.settingsTitle",     value: "Configuración" },
     { key: "page.settingsSub",       value: "Gestión de servicios y usuarios del sistema" },
-    // Calendar
     { key: "calendar.view.week",  value: "Semana" },
     { key: "calendar.view.day",   value: "Día" },
     { key: "calendar.filter.all", value: "Todas" },
@@ -202,7 +217,6 @@ async function main() {
     { key: "calendar.day.4",      value: "Jue" },
     { key: "calendar.day.5",      value: "Vie" },
     { key: "calendar.day.6",      value: "Sáb" },
-    // Table columns
     { key: "table.clientColumn", value: "Cliente" },
     { key: "table.phone",        value: "Teléfono" },
     { key: "table.email",        value: "Email" },
@@ -212,15 +226,11 @@ async function main() {
     { key: "table.duration",     value: "Duración" },
     { key: "table.price",        value: "Precio" },
     { key: "table.status",       value: "Estado" },
-    // Pagination
     { key: "pagination.previous", value: "Anterior" },
     { key: "pagination.next",     value: "Siguiente" },
     { key: "pagination.page",     value: "página" },
-    // Search
     { key: "search.clients", value: "Buscar por nombre, teléfono o email..." },
-    // Empty states
     { key: "empty.clients", value: "No se encontraron clientes" },
-    // Form: New appointment
     { key: "form.title.newAppointment",      value: "Nuevo turno" },
     { key: "form.subtitle.newAppointment",   value: "Completá los datos del turno" },
     { key: "form.section.clientData",        value: "Datos del cliente" },
@@ -240,7 +250,6 @@ async function main() {
     { key: "form.placeholder.internalNotes", value: "Ej: cliente prefiere sesión en silencio" },
     { key: "form.whatsapp.label",            value: "Enviar confirmación por WhatsApp" },
     { key: "form.whatsapp.sub",              value: "Mensaje automático con fecha y hora" },
-    // Form: New client
     { key: "form.title.newClient",         value: "Nuevo cliente" },
     { key: "form.subtitle.newClient",      value: "Registrá un nuevo cliente" },
     { key: "form.field.fullName",          value: "Nombre completo" },
@@ -251,25 +260,20 @@ async function main() {
     { key: "form.field.emailOptional",     value: "Email (opcional)" },
     { key: "form.placeholder.email",       value: "cliente@email.com" },
     { key: "form.placeholder.clientNotes", value: "Alergias, preferencias..." },
-    // Form: Services settings
     { key: "form.field.name",          value: "Nombre" },
     { key: "form.placeholder.service", value: "Manicura clásica" },
     { key: "form.field.durationMin",   value: "Duración (min)" },
-    { key: "form.field.priceArs",      value: "Precio ($)" },
-    // Form: Users settings
+    { key: "form.field.priceArs",      value: "Precio (€)" },
     { key: "form.field.calendarColor",   value: "Color en calendario" },
     { key: "form.placeholder.nameMani",  value: "Sofía Romero" },
     { key: "form.placeholder.emailMani", value: "sofia@dates.app" },
     { key: "form.field.password",        value: "Contraseña" },
     { key: "form.placeholder.password",  value: "Mínimo 8 caracteres" },
-    // Messages
     { key: "message.selectServiceFirst", value: "Elegí un servicio primero" },
     { key: "message.searchingSlots",     value: "Buscando turnos..." },
     { key: "message.noAvailability",     value: "Sin disponibilidad" },
-    // Currency
-    { key: "app.currency",       value: "ARS" },
-    { key: "app.currencyLocale", value: "es-AR" },
-    // Form: extra
+    { key: "app.currency",       value: "EUR" },
+    { key: "app.currencyLocale", value: "es-ES" },
     { key: "form.field.color",        value: "Color" },
     { key: "action.editService",      value: "Editar" },
     { key: "section.currency",        value: "Moneda" },
@@ -278,10 +282,8 @@ async function main() {
     { key: "currency.label.USD",      value: "Dólar estadounidense" },
     { key: "currency.label.COP",      value: "Peso colombiano" },
     { key: "currency.label.EUR",      value: "Euro" },
-    // Errors
     { key: "error.createAppointment", value: "Error al crear el turno" },
     { key: "error.createClient",      value: "Error al crear el cliente" },
-    // Validation
     { key: "validation.selectClient",     value: "Seleccioná un cliente" },
     { key: "validation.selectManicurist", value: "Seleccioná una profesional" },
     { key: "validation.selectService",    value: "Seleccioná un servicio" },
@@ -292,17 +294,17 @@ async function main() {
   ];
 
   for (const { key, value } of defaultSettings) {
-    await prisma.appSetting.upsert({
-      where:  { businessId_key: { businessId, key } },
-      update: { value },
-      create: { businessId, key, value },
-    });
+    await prisma.appSetting.create({ data: { businessId, key, value } });
   }
 
-  console.log(`✅ Seed complete – ${defaultSettings.length} settings upserted`);
-  console.log(`   Admin: admin@dates.app / admin123`);
-  console.log(`   Manicurist: sofia@dates.app / mani123`);
-  console.log(`   Manicurist: valentina@dates.app / mani123`);
+  console.log("✅ Seed completo");
+  console.log("─────────────────────────────────────");
+  console.log("  OWNER:  bvittys@gmail.com    / 123vittyS");
+  console.log("  ADMIN:  paolaLopez@gmail.com / Montecatini123");
+  console.log("  MANI:   mafe@gmail.com        / 123mani");
+  console.log("  MANI:   paola@gmail.com       / 123mani");
+  console.log("  Empresa: Montecatini (slug: montecatini)");
+  console.log("─────────────────────────────────────");
 }
 
 main()
