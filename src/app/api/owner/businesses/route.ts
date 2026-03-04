@@ -4,12 +4,13 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import type { Session } from "next-auth";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { apiError, apiSuccess } from "@/lib/utils";
 import { z } from "zod";
 
-function requireOwner(session: Awaited<ReturnType<typeof auth>>) {
+function requireOwner(session: Session | null) {
   if (!session) return NextResponse.json(apiError("Unauthorized"), { status: 401 });
   if (session.user.role !== "OWNER") return NextResponse.json(apiError("Forbidden"), { status: 403 });
   return null;

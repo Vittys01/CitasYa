@@ -5,12 +5,13 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import type { Session } from "next-auth";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { apiError, apiSuccess } from "@/lib/utils";
 import { z } from "zod";
 
-async function getOwnedBusiness(session: Awaited<ReturnType<typeof auth>>, id: string) {
+async function getOwnedBusiness(session: Session | null, id: string) {
   if (!session) return null;
   if (session.user.role !== "OWNER") return null;
   return prisma.business.findFirst({ where: { id, ownerId: session.user.id } });
