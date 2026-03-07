@@ -38,7 +38,7 @@ NGINX_CONF="/etc/nginx/sites-available/$DOMAIN"
 cat > "$NGINX_CONF" <<EOF
 server {
     listen 80;
-    server_name $DOMAIN www.$DOMAIN;
+    server_name $DOMAIN;
 
     # Seguridad básica
     add_header X-Frame-Options "SAMEORIGIN"         always;
@@ -75,7 +75,6 @@ echo "   Nginx configurado OK"
 echo "[3/4] Obteniendo certificado SSL..."
 certbot --nginx \
   -d "$DOMAIN" \
-  -d "www.$DOMAIN" \
   --email "$EMAIL" \
   --agree-tos \
   --non-interactive \
