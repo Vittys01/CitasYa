@@ -9,12 +9,6 @@ export default async function WhatsAppPage() {
   if (session.user.role !== "ADMIN" && session.user.role !== "OWNER") redirect("/dashboard");
   const businessId = session.user.businessId!;
   const settings = await getAppSettings(businessId);
-  const evolutionManagerUrl =
-    process.env.EVOLUTION_API_URL &&
-    process.env.WHATSAPP_PROVIDER === "evolution"
-      ? `${process.env.EVOLUTION_API_URL.replace(/\/$/, "")}/manager`
-      : undefined;
-
   return (
     <div className="max-w-7xl mx-auto">
       <div className="mb-6 flex items-center gap-2 text-sm text-[#9c8273]">
@@ -34,10 +28,7 @@ export default async function WhatsAppPage() {
         </p>
       </div>
 
-      <WhatsAppPageContent
-        settings={settings}
-        evolutionManagerUrl={evolutionManagerUrl}
-      />
+      <WhatsAppPageContent settings={settings} />
     </div>
   );
 }

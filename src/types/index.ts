@@ -34,12 +34,22 @@ export type ManicuristWithUser = Manicurist & {
   schedules: Schedule[];
 };
 
+export type AppointmentServiceWithService = {
+  id: string;
+  serviceId: string;
+  durationMinutes: number | null;
+  price: { toNumber: () => number } | number;
+  sortOrder: number;
+  service: Pick<Service, "id" | "name" | "duration" | "color">;
+};
+
 export type AppointmentWithRelations = Appointment & {
   client: Pick<Client, "id" | "name" | "phone" | "email">;
   manicurist: Manicurist & {
     user: Pick<User, "id" | "name" | "avatarUrl">;
   };
   service: Pick<Service, "id" | "name" | "duration" | "color">;
+  services?: AppointmentServiceWithService[];
 };
 
 export type ClientWithHistory = Client & {
@@ -48,12 +58,22 @@ export type ClientWithHistory = Client & {
 
 // ─── API request / response shapes ───────────────────────────────────────────
 
+export interface AppointmentServiceInput {
+  serviceId: string;
+  durationMinutes?: number; // null/undefined = usar duración del servicio
+}
+
 export interface CreateAppointmentInput {
   clientId: string;
   manicuristId: string;
-  serviceId: string;
+  /** @deprecated Usar services. Si se pasa, se crea un solo servicio. */
+  serviceId?: string;
+  /** Múltiples servicios con duración personalizable */
+  services?: AppointmentServiceInput[];
   startAt: string; // ISO string
   notes?: string;
+  /** Precio total override (solo para esta cita, ej: diseño extra, adicionales) */
+  price?: number;
 }
 
 export interface UpdateAppointmentInput {
@@ -62,6 +82,8 @@ export interface UpdateAppointmentInput {
   startAt?: string;
   manicuristId?: string;
   serviceId?: string;
+  /** Precio total override (solo para esta cita) */
+  price?: number;
 }
 
 export interface CreateClientInput {

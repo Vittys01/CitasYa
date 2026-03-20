@@ -200,6 +200,65 @@ export default function AppointmentsCalendar({
   const [selectedAppointment, setSelectedAppointment] = useState<AppointmentForClient | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
+  const [draggingApptId, setDraggingApptId] = useState<string | null>(null);
+  const [dropTargetDay, setDropTargetDay] = useState<Date | null>(null);
+
+  const handleApptDrop = useCallback(
+    async (appointmentId: string, targetDay: Date) => {
+      const appt = displayAppointments.find((a) => a.id === appointmentId);
+      if (!appt || appt.status === "CANCELLED" || appt.status === "COMPLETED") return;
+      const start = new Date(appt.startAt);
+      const newStart = new Date(targetDay);
+      newStart.setHours(start.getHours(), start.getMinutes(), 0, 0);
+      const durationMs = new Date(appt.endAt).getTime() - new Date(appt.startAt).getTime();
+      const newEnd = new Date(newStart.getTime() + durationMs);
+        const updated: AppointmentForClient = { ...appt, startAt: newStart.toISOString(), endAt: newEnd.toISOString() };
+      try {
+        const res = await fetch(`/api/appointments/${appointmentId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ startAt: newStart.toISOString() }),
+        });
+        if (!res.ok) {
+          const j = await res.json();
+          throw new Error(j.error?.message ?? "Error al mover");
+        }
+        const sourceKey = format(startOfWeek(start, { weekStartsOn: 1 }), "yyyy-MM-dd");
+        const targetKey = format(startOfWeek(targetDay, { weekStartsOn: 1 }), "yyyy-MM-dd");
+        setAppointments((prev) => {
+          if (sourceKey === initialWeekStartKey && targetKey === initialWeekStartKey) {
+            return prev.map((a) => (a.id === appointmentId ? updated : a));
+          }
+          if (sourceKey === initialWeekStartKey) return prev.filter((a) => a.id !== appointmentId);
+          if (targetKey === initialWeekStartKey) {
+            return [...prev.filter((a) => a.id !== appointmentId), updated].sort(
+              (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime()
+            );
+          }
+          return prev;
+        });
+        setFetchedByWeek((prev) => {
+          const next = { ...prev };
+          if (next[sourceKey]) {
+            next[sourceKey] = next[sourceKey].filter((a) => a.id !== appointmentId);
+          }
+          if (next[targetKey]) {
+            next[targetKey] = [...next[targetKey].filter((a) => a.id !== appointmentId), updated].sort(
+              (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime()
+            );
+          }
+          return next;
+        });
+        router.refresh();
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setDraggingApptId(null);
+        setDropTargetDay(null);
+      }
+    },
+    [displayAppointments, router, initialWeekStartKey]
+  );
 
   const days = useMemo(
     () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
@@ -315,9 +374,19 @@ export default function AppointmentsCalendar({
                   <p className="text-[10px] font-bold text-earth-muted uppercase tracking-wider mb-1">
                     {(settings && settings["form.section.service"]) ?? "Servicio"}
                   </p>
-                  <p className="text-sm font-semibold text-earth">{selectedAppointment.service.name}</p>
+                  {(selectedAppointment as { services?: Array<{ service: { name: string; duration: number }; durationMinutes: number | null }> }).services?.length ? (
+                    <ul className="text-sm space-y-1">
+                      {(selectedAppointment as { services: Array<{ service: { name: string; duration: number }; durationMinutes: number | null }> }).services.map((x, i) => (
+                        <li key={i} className="text-earth">
+                          {x.service.name} — {x.durationMinutes ?? x.service.duration} {(settings && settings["common.minutes"]) ?? "min"}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm font-semibold text-earth">{selectedAppointment.service.name}</p>
+                  )}
                   <p className="text-xs text-earth-muted mt-0.5">
-                    {selectedAppointment.service.duration} {(settings && settings["common.minutes"]) ?? "min"} · {formatPrice(Number(selectedAppointment.price), settings)}
+                    {formatPrice(Number(selectedAppointment.price), settings)}
                   </p>
                 </div>
                 <div>
@@ -359,9 +428,7 @@ export default function AppointmentsCalendar({
                       setCancelError(null);
                       setCancelling(true);
                       const res = await fetch(`/api/appointments/${selectedAppointment.id}`, {
-                        method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ status: "CANCELLED" }),
+                        method: "DELETE",
                       });
                       setCancelling(false);
                       if (!res.ok) {
@@ -369,9 +436,14 @@ export default function AppointmentsCalendar({
                         setCancelError(j.error?.message ?? "Error al cancelar");
                         return;
                       }
-                      setAppointments((prev) =>
-                        prev.map((a) => (a.id === selectedAppointment.id ? { ...a, status: "CANCELLED" as const } : a))
-                      );
+                      setAppointments((prev) => prev.filter((a) => a.id !== selectedAppointment.id));
+                      setFetchedByWeek((prev) => {
+                        const next = { ...prev };
+                        for (const key of Object.keys(next)) {
+                          next[key] = next[key].filter((a) => a.id !== selectedAppointment.id);
+                        }
+                        return next;
+                      });
                       setSelectedAppointment(null);
                       router.refresh();
                     }}
@@ -669,6 +741,11 @@ export default function AppointmentsCalendar({
                       onEmptySlotClick={onEmptySlotClick}
                       slotDay={day}
                       slotManicuristId={undefined}
+                      onApptDrop={handleApptDrop}
+                      draggingApptId={draggingApptId}
+                      setDraggingApptId={setDraggingApptId}
+                      dropTargetDay={dropTargetDay}
+                      setDropTargetDay={setDropTargetDay}
                     />
                   );
                 })}
@@ -709,6 +786,11 @@ export default function AppointmentsCalendar({
                           onEmptySlotClick={onEmptySlotClick}
                           slotDay={selectedDay}
                           slotManicuristId={m.id}
+                          onApptDrop={handleApptDrop}
+                          draggingApptId={draggingApptId}
+                          setDraggingApptId={setDraggingApptId}
+                          dropTargetDay={dropTargetDay}
+                          setDropTargetDay={setDropTargetDay}
                         />
                       );
                     })
@@ -755,6 +837,11 @@ function DayColumn({
   onEmptySlotClick,
   slotDay,
   slotManicuristId,
+  onApptDrop,
+  draggingApptId,
+  setDraggingApptId,
+  dropTargetDay,
+  setDropTargetDay,
 }: {
   gridHeight: number;
   workBands: WorkBand[];
@@ -771,6 +858,11 @@ function DayColumn({
   onEmptySlotClick?: (slot: EmptySlotPayload) => void;
   slotDay: Date;
   slotManicuristId?: string;
+  onApptDrop?: (appointmentId: string, targetDay: Date) => void;
+  draggingApptId?: string | null;
+  setDraggingApptId?: (id: string | null) => void;
+  dropTargetDay?: Date | null;
+  setDropTargetDay?: (day: Date | null) => void;
 }) {
   const handleColumnClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
@@ -790,16 +882,45 @@ function DayColumn({
     [onEmptySlotClick, slotDay, slotManicuristId, gridHeight]
   );
 
+  const isDropTarget = dropTargetDay && isSameDay(slotDay, dropTargetDay);
+
   return (
     <div
       className={cn(
         "border-r border-[#e6d5c3] last:border-r-0 relative",
-        onEmptySlotClick && "cursor-pointer"
+        onEmptySlotClick && "cursor-pointer",
+        isDropTarget && "ring-2 ring-primary ring-inset bg-primary/5"
       )}
       style={{ height: gridHeight }}
       onClick={handleColumnClick}
       role={onEmptySlotClick ? "button" : undefined}
       aria-label={onEmptySlotClick ? "Agregar turno en este horario" : undefined}
+      onDragOver={
+        onApptDrop && draggingApptId
+          ? (e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "move";
+              setDropTargetDay?.(slotDay);
+            }
+          : undefined
+      }
+      onDragLeave={
+        onApptDrop
+          ? () => {
+              setDropTargetDay?.(null);
+            }
+          : undefined
+      }
+      onDrop={
+        onApptDrop && draggingApptId
+          ? (e) => {
+              e.preventDefault();
+              const id = e.dataTransfer.getData("appointmentId");
+              if (id) onApptDrop(id, slotDay);
+              setDropTargetDay?.(null);
+            }
+          : undefined
+      }
     >
       {workBands.map((band, i) => (
         <div
@@ -841,14 +962,28 @@ function DayColumn({
         const leftPct      = isSideBySide ? 4 + colIndex * (92 / totalCols) : 4;
         const widthPct     = isSideBySide ? 92 / totalCols - 0.5 : 92;
 
+        const canDrag = appt.status !== "CANCELLED" && appt.status !== "COMPLETED" && onApptDrop;
+
         return (
           <button
             key={appt.id}
             type="button"
+            draggable={canDrag ? true : false}
+            onDragStart={
+              canDrag
+                ? (e) => {
+                    e.dataTransfer.setData("appointmentId", appt.id);
+                    e.dataTransfer.effectAllowed = "move";
+                    setDraggingApptId?.(appt.id);
+                  }
+                : undefined
+            }
+            onDragEnd={() => setDraggingApptId?.(null)}
             onClick={() => onApptClick(appt)}
             className={cn(
               "absolute rounded-r-md rounded-l-sm border-l-4 px-2 py-1.5 cursor-pointer hover:brightness-95 transition-all hover:shadow-warm-sm z-10 text-left w-full min-w-0 flex flex-col",
-              s.bg, s.text
+              s.bg, s.text,
+              draggingApptId === appt.id && "opacity-50"
             )}
             style={{
               top,
@@ -859,7 +994,7 @@ function DayColumn({
               borderLeftStyle: "solid",
               borderLeftWidth: "4px",
             }}
-            title={`${appt.client.name} · ${appt.service.name} · ${appt.manicurist.user.name} · ${formatPrice(Number(appt.price), settings)} — Click para ver detalle`}
+            title={`${appt.client.name} · ${(appt as { services?: Array<{ service: { name: string } }> }).services?.length ? (appt as { services: Array<{ service: { name: string } }> }).services.map((x) => x.service.name).join(", ") : appt.service.name} · ${appt.manicurist.user.name} · ${formatPrice(Number(appt.price), settings)} — Click para ver detalle`}
           >
             <div className="flex items-start justify-between gap-1 min-h-0 flex-1 min-w-0">
               <p className="text-xs font-bold leading-tight truncate min-w-0">{appt.client.name}</p>
@@ -868,7 +1003,11 @@ function DayColumn({
               </span>
             </div>
             {!short && (
-              <p className="text-[10px] opacity-70 truncate mt-0.5 leading-tight">{appt.service.name}</p>
+              <p className="text-[10px] opacity-70 truncate mt-0.5 leading-tight">
+                {(appt as { services?: Array<{ service: { name: string } }> }).services?.length
+                  ? (appt as { services: Array<{ service: { name: string } }> }).services.map((x) => x.service.name).join(", ")
+                  : appt.service.name}
+              </p>
             )}
             <div className="flex items-center justify-between mt-0.5 gap-1 flex-shrink-0">
               <span className="text-[10px] opacity-60 whitespace-nowrap tabular-nums">

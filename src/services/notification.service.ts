@@ -8,7 +8,7 @@
 import { prisma } from "@/lib/db";
 import { getAppSettings } from "@/services/settings.service";
 import {
-  getProviderForInstance,
+  getProviderForBusiness,
   buildConfirmationMessage,
   buildReminderMessage,
   buildCancellationMessage,
@@ -61,10 +61,10 @@ export async function processNotification(
     getAppSettings(businessId),
     prisma.business.findUnique({
       where: { id: businessId },
-      select: { whatsappInstanceName: true },
+      select: { whatsappProvider: true, metaPhoneNumberId: true, metaAccessToken: true },
     }),
   ]);
-  const provider = getProviderForInstance(business?.whatsappInstanceName ?? undefined);
+  const provider = getProviderForBusiness(business);
   const templateConfirmation = settings["whatsapp.template.confirmation"];
   const templateReminder = settings["whatsapp.template.reminder"];
   const templateCancellation = settings["whatsapp.template.cancellation"];

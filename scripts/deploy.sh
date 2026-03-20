@@ -8,7 +8,6 @@
 #   APP_DIR        Directorio donde clonar (default: ~/app)
 #   APP_URL        URL pública de la app (ej: https://tudominio.com)
 #   AUTH_SECRET    Secret de NextAuth (mínimo 32 chars)
-#   EVOLUTION_KEY  API key de Evolution (WhatsApp)
 # =============================================================================
 set -euo pipefail
 
@@ -43,8 +42,10 @@ if [[ -z "${REPO_URL:-}" ]]; then
 fi
 
 APP_DIR="${APP_DIR:-$HOME/app}"
-read -rp "  Directorio de instalación [$APP_DIR]: " INPUT_DIR
-APP_DIR="${INPUT_DIR:-$APP_DIR}"
+if [[ -t 0 ]]; then
+  read -rp "  Directorio de instalación [$APP_DIR]: " INPUT_DIR
+  APP_DIR="${INPUT_DIR:-$APP_DIR}"
+fi
 
 if [[ -z "${APP_URL:-}" ]]; then
   read -rp "  URL pública de la app (ej: https://tudominio.com): " APP_URL
@@ -57,11 +58,6 @@ if [[ -z "${AUTH_SECRET:-}" ]]; then
   warn "AUTH_SECRET generado automáticamente (guárdalo si necesitas mantener sesiones):"
   echo "  $AUTH_SECRET"
 fi
-
-if [[ -z "${EVOLUTION_KEY:-}" ]]; then
-  read -rp "  Evolution API key [evolution_secret]: " EVOLUTION_KEY
-fi
-EVOLUTION_KEY="${EVOLUTION_KEY:-evolution_secret}"
 
 echo ""
 
@@ -86,7 +82,6 @@ fi
 info "Generando .env..."
 # Contraseñas de DB generadas aleatoriamente
 DB_PASS=$(openssl rand -hex 16)
-EVOLUTION_INSTANCE="dates-instance"
 
 cat > "$ENV_FILE" <<EOF
 # ── App ───────────────────────────────────────────────────────────────────────
@@ -103,18 +98,16 @@ AUTH_SECRET="${AUTH_SECRET}"
 # ── Redis (BullMQ) ────────────────────────────────────────────────────────────
 REDIS_URL="redis://redis:6379"
 
-# ── WhatsApp (Evolution API) ──────────────────────────────────────────────────
-WHATSAPP_PROVIDER="evolution"
-EVOLUTION_API_URL="http://evolution:8080"
-EVOLUTION_API_KEY="${EVOLUTION_KEY}"
-EVOLUTION_INSTANCE="${EVOLUTION_INSTANCE}"
+# ── WhatsApp (Meta Cloud API) ──────────────────────────────────────────────────
+# Configurá por negocio en el panel Owner, o usá estas variables como fallback:
+# META_WHATSAPP_TOKEN="EAAxxxxxxx"
+# META_PHONE_NUMBER_ID="10000000000"
 
 # ── Recordatorios ─────────────────────────────────────────────────────────────
 REMINDER_HOURS_BEFORE="24"
 EOF
 
 # Actualizar las contraseñas de Postgres en docker-compose también via override
-# (las credenciales del docker-compose deben coincidir con DATABASE_URL)
 cat > "$APP_DIR/docker-compose.override.yml" <<EOF
 services:
   postgres:
@@ -122,10 +115,6 @@ services:
       POSTGRES_USER:     dates_user
       POSTGRES_PASSWORD: "${DB_PASS}"
       POSTGRES_DB:       dates_db
-  evolution:
-    environment:
-      DATABASE_CONNECTION_URI: "postgresql://dates_user:${DB_PASS}@postgres:5432/dates_db?schema=public"
-      AUTHENTICATION_API_KEY:  "${EVOLUTION_KEY}"
 EOF
 
 success ".env generado"
@@ -156,7 +145,16 @@ until curl -sf "http://localhost:3000/api/auth/session" &>/dev/null; do
 done
 echo ""
 
-# ── 7. Estado final ───────────────────────────────────────────────────────────
+# ── 7. Verificar que Redis/Postgres no estén expuestos ────────────────────────
+info "Verificando puertos (Redis/Postgres no deben estar expuestos)..."
+EXPOSED=$(ss -tlnp 2>/dev/null | grep -E ':(6379|5432)\s' || true)
+if [[ -n "$EXPOSED" ]]; then
+  warn "Redis (6379) o Postgres (5432) están expuestos. Revisá docker-compose."
+else
+  success "Redis y Postgres no expuestos (correcto)"
+fi
+
+# ── 8. Estado final ───────────────────────────────────────────────────────────
 echo ""
 echo -e "${BOLD}================================================${NC}"
 success "Deploy completado!"
@@ -173,6 +171,5 @@ echo "  Reiniciar app:          docker compose -f $APP_DIR/docker-compose.yml re
 echo "  Estado servicios:       docker compose -f $APP_DIR/docker-compose.yml ps"
 echo "  Parar todo:             docker compose -f $APP_DIR/docker-compose.yml down"
 echo ""
-echo -e "${YELLOW}Recuerda configurar Nginx + SSL con Certbot si usas dominio propio.${NC}"
-echo -e "  bash nginx-setup.sh (ver scripts/nginx-setup.sh)"
+echo -e "${YELLOW}Para Nginx + SSL:${NC} sudo bash scripts/nginx-setup.sh tudominio.com email@tudominio.com"
 echo ""

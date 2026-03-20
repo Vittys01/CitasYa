@@ -20,6 +20,7 @@ const updateSchema = z.object({
   startAt: z.string().datetime().optional(),
   manicuristId: z.string().cuid().optional(),
   serviceId: z.string().cuid().optional(),
+  price: z.number().min(0).optional(),
 });
 
 type Params = { params: Promise<{ id: string }> };
@@ -56,6 +57,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   try {
     const updated = await updateAppointment(id, parsed.data);
+    if (updated === null) {
+      return NextResponse.json(apiSuccess({ deleted: true }));
+    }
     return NextResponse.json(apiSuccess(updated));
   } catch (err) {
     return NextResponse.json(apiError(String(err), "BUSINESS"), { status: 409 });

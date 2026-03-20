@@ -47,10 +47,8 @@ function formatPreviewHtml(text: string): React.ReactNode {
 
 export default function WhatsAppPageContent({
   settings = {},
-  evolutionManagerUrl,
 }: {
   settings?: Record<string, string>;
-  evolutionManagerUrl?: string;
 }) {
   const [templateConfirmation, setTemplateConfirmation] = useState(settings["whatsapp.template.confirmation"] ?? "");
   const [templateReminder, setTemplateReminder] = useState(settings["whatsapp.template.reminder"] ?? "");
@@ -58,40 +56,11 @@ export default function WhatsAppPageContent({
   const [templatesSaving, setTemplatesSaving] = useState(false);
   const [templatesMessage, setTemplatesMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
 
-  const [qrLoading, setQrLoading] = useState(false);
-  const [qrImage, setQrImage] = useState<string | null>(null);
-  const [qrImageError, setQrImageError] = useState(false);
-  const [qrPairingCode, setQrPairingCode] = useState<string | null>(null);
-  const [qrError, setQrError] = useState<string | null>(null);
-
   useEffect(() => {
     setTemplateConfirmation(settings["whatsapp.template.confirmation"] ?? "");
     setTemplateReminder(settings["whatsapp.template.reminder"] ?? "");
     setTemplateCancellation(settings["whatsapp.template.cancellation"] ?? "");
   }, [settings["whatsapp.template.confirmation"], settings["whatsapp.template.reminder"], settings["whatsapp.template.cancellation"]]);
-
-  async function handleShowQrHere() {
-    setQrError(null);
-    setQrImage(null);
-    setQrImageError(false);
-    setQrPairingCode(null);
-    setQrLoading(true);
-    try {
-      const res = await fetch("/api/whatsapp/qr");
-      const data = await res.json().catch(() => ({}));
-      if (res.ok) {
-        if (data.base64) setQrImage(data.base64);
-        if (data.pairingCode) setQrPairingCode(data.pairingCode);
-        if (!data.base64 && !data.pairingCode) setQrError("No se recibió QR ni código.");
-      } else {
-        setQrError(data?.error ?? `Error ${res.status}`);
-      }
-    } catch (e) {
-      setQrError(String(e));
-    } finally {
-      setQrLoading(false);
-    }
-  }
 
   async function handleSaveTemplates() {
     setTemplatesMessage(null);
@@ -139,7 +108,7 @@ export default function WhatsAppPageContent({
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-green-600" />
                 </span>
                 <span className="text-sm text-green-700 font-medium">
-                  Evolution API · Vincular número para enviar mensajes
+                  Meta Cloud API · Configurá en el panel de negocio
                 </span>
               </div>
             </div>
@@ -210,75 +179,6 @@ export default function WhatsAppPageContent({
             </p>
           )}
         </div>
-
-        {/* Ver código QR */}
-        <div className="rounded-xl border border-[#e6d5c3] bg-[#fbf6f1] p-5 space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-base font-bold text-[#4a3b32] flex items-center gap-2">
-              <span className="material-symbols-outlined text-[#7f5539] text-[20px]">qr_code_2</span>
-              Ver código QR
-            </h3>
-            <Link
-              href="/settings/whatsapp-qr"
-              className="text-sm font-medium text-[#7f5539] hover:text-[#6d4a32] flex items-center gap-1 transition-colors"
-            >
-              <span className="material-symbols-outlined text-[18px]">open_in_new</span>
-              Ver código QR en una página aparte
-            </Link>
-          </div>
-          <p className="text-sm text-[#7f6a5d]">
-            Mostrá el código acá o abrilo en otra pestaña para escanear con WhatsApp.
-          </p>
-          <button
-            type="button"
-            onClick={handleShowQrHere}
-            disabled={qrLoading}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#7f5539] text-white text-sm font-semibold hover:bg-[#6d4a32] disabled:opacity-60 transition-colors"
-          >
-            <span className="material-symbols-outlined text-[20px]">qr_code_2</span>
-            {qrLoading ? "Cargando…" : "Ver QR aquí"}
-          </button>
-          <div className="flex flex-col items-center gap-2 w-full pt-2">
-            <div className="w-44 h-44 flex items-center justify-center border-2 border-[#e6d5c3] rounded-xl bg-white text-center">
-              {qrLoading && (
-                <div className="flex flex-col items-center gap-2 text-[#9c8273]">
-                  <span className="material-symbols-outlined text-4xl animate-pulse">qr_code_2</span>
-                  <span className="text-sm">Cargando…</span>
-                </div>
-              )}
-              {!qrLoading && qrError && <p className="text-sm text-red-700 px-4">{qrError}</p>}
-              {!qrLoading && !qrError && qrPairingCode && !qrImage && !qrImageError && (
-                <p className="text-sm text-[#4a3b32] px-2 font-mono text-base">{qrPairingCode}</p>
-              )}
-              {!qrLoading && !qrError && qrImage && !qrImageError && (
-                <img
-                  src={qrImage.startsWith("data:") ? qrImage : `data:image/png;base64,${qrImage}`}
-                  alt="QR para vincular WhatsApp"
-                  className="w-full h-full object-contain rounded-lg"
-                  onError={() => setQrImageError(true)}
-                />
-              )}
-              {!qrLoading && !qrError && qrImageError && (
-                <p className="text-sm text-amber-700 px-4">No se pudo mostrar la imagen.</p>
-              )}
-              {!qrLoading && !qrError && !qrImage && !qrPairingCode && !qrImageError && (
-                <p className="text-sm text-[#9c8273] px-4">Tocá «Ver QR aquí» para cargar.</p>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {evolutionManagerUrl && (
-          <a
-            href={evolutionManagerUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#7f5539] text-white text-sm font-semibold hover:bg-[#6d4a32] transition-colors"
-          >
-            <span className="material-symbols-outlined text-[20px]">open_in_new</span>
-            Abrir Manager de Evolution
-          </a>
-        )}
 
         <div className="flex items-center justify-end gap-3 pt-4 pb-8">
           <Link

@@ -13,13 +13,23 @@ import {
 } from "@/services/appointment.service";
 import { z } from "zod";
 
+const appointmentServiceSchema = z.object({
+  serviceId: z.string().cuid(),
+  durationMinutes: z.number().int().positive().optional(),
+});
+
 const createSchema = z.object({
   clientId: z.string().cuid(),
   manicuristId: z.string().cuid(),
-  serviceId: z.string().cuid(),
+  serviceId: z.string().cuid().optional(),
+  services: z.array(appointmentServiceSchema).optional(),
   startAt: z.string().datetime(),
   notes: z.string().optional(),
-});
+  price: z.number().min(0).optional(),
+}).refine(
+  (d) => d.serviceId || (d.services && d.services.length > 0),
+  { message: "Indicá serviceId o services" }
+);
 
 export async function GET(req: NextRequest) {
   const session = await auth();

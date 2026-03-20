@@ -27,11 +27,10 @@ export default function BusinessForm({ initialValues, businessId }: BusinessForm
   const [isActive, setIsActive] = useState(initialValues?.isActive ?? true);
   const [slugTouched, setSlugTouched] = useState(isEdit);
 
-  // WhatsApp
-  const [wpProvider, setWpProvider] = useState<"" | "evolution" | "meta">(
-    (initialValues?.whatsappProvider as "" | "evolution" | "meta") ?? ""
+  // WhatsApp (Meta Cloud API)
+  const [wpProvider, setWpProvider] = useState<"" | "meta">(
+    initialValues?.whatsappProvider === "meta" ? "meta" : ""
   );
-  const [wpInstance, setWpInstance] = useState(initialValues?.whatsappInstanceName ?? "");
   const [metaPhone, setMetaPhone] = useState(initialValues?.metaPhoneNumberId ?? "");
   const [metaToken, setMetaToken] = useState(initialValues?.metaAccessToken ?? "");
 
@@ -69,7 +68,7 @@ export default function BusinessForm({ initialValues, businessId }: BusinessForm
     if (isEdit) {
       body.isActive = isActive;
       body.whatsappProvider = wpProvider;
-      body.whatsappInstanceName = wpProvider === "evolution" ? wpInstance || null : null;
+      body.whatsappInstanceName = null;
       body.metaPhoneNumberId = wpProvider === "meta" ? metaPhone || null : null;
       body.metaAccessToken = wpProvider === "meta" ? metaToken || null : null;
     }
@@ -210,35 +209,16 @@ export default function BusinessForm({ initialValues, businessId }: BusinessForm
           </h3>
 
           <div>
-            <label className="block text-sm font-semibold text-[#4a3b32] mb-1.5">Proveedor</label>
+            <label className="block text-sm font-semibold text-[#4a3b32] mb-1.5">WhatsApp (Meta Cloud API)</label>
             <select
               value={wpProvider}
-              onChange={(e) => setWpProvider(e.target.value as "" | "evolution" | "meta")}
+              onChange={(e) => setWpProvider(e.target.value as "" | "meta")}
               className="w-full px-4 py-2.5 rounded-xl border border-[#e6d5c3] bg-white text-[#4a3b32] focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition text-sm"
             >
               <option value="">Sin WhatsApp</option>
-              <option value="evolution">Evolution API (self-hosted)</option>
               <option value="meta">Meta Cloud API</option>
             </select>
           </div>
-
-          {wpProvider === "evolution" && (
-            <div>
-              <label className="block text-sm font-semibold text-[#4a3b32] mb-1.5">
-                Nombre de instancia Evolution
-              </label>
-              <input
-                type="text"
-                value={wpInstance}
-                onChange={(e) => setWpInstance(e.target.value)}
-                placeholder="montecatini-instance"
-                className="w-full px-4 py-2.5 rounded-xl border border-[#e6d5c3] bg-white text-[#4a3b32] placeholder:text-[#c4a882] focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition text-sm"
-              />
-              <p className="text-xs text-[#9c8273] mt-1">
-                Debe coincidir con <code className="bg-[#f5ede6] px-1 rounded">EVOLUTION_INSTANCE</code> en el .env de ese negocio.
-              </p>
-            </div>
-          )}
 
           {wpProvider === "meta" && (
             <>

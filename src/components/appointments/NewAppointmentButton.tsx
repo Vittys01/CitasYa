@@ -42,13 +42,14 @@ type NewClientForm = {
 
 const g = (s: Record<string, string> | undefined, k: string, fb: string) => (s && s[k]) ?? fb;
 
+type SelectedService = { serviceId: string; durationMinutes?: number };
+
 const schema = z.object({
   clientId:     z.string().min(1),
   manicuristId: z.string().min(1),
-  serviceId:    z.string().min(1),
   startAt:      z.string().min(1),
   notes:        z.string().optional(),
-});
+}).refine((d) => d.clientId && d.manicuristId && d.startAt, { message: "Completá todos los campos" });
 
 type FormData = z.infer<typeof schema>;
 
@@ -95,8 +96,21 @@ export default function NewAppointmentButton({
     formState: { errors, isSubmitting },
   } = useForm<FormData>({ resolver: zodResolver(schema) });
 
-  const watchService = watch("serviceId");
-  const selectedService = services.find((s) => s.id === watchService);
+  // ── Selected services (múltiples + duración personalizable) ────────────────────
+  const [selectedServices, setSelectedServices] = useState<SelectedService[]>([]);
+  const totalDuration = selectedServices.reduce((sum, item) => {
+    const svc = services.find((s) => s.id === item.serviceId);
+    return sum + (item.durationMinutes ?? svc?.duration ?? 0);
+  }, 0);
+  const totalPrice = selectedServices.reduce((sum, item) => {
+    const svc = services.find((s) => s.id === item.serviceId);
+    return sum + (svc ? Number(svc.price) : 0);
+  }, 0);
+  const firstServiceId = selectedServices[0]?.serviceId ?? "";
+
+  const [priceOverride, setPriceOverride] = useState<number | null>(null);
+  useEffect(() => { setPriceOverride(null); }, [selectedServices]);
+  const finalPrice = priceOverride ?? totalPrice;
 
   // ── Slot state ──────────────────────────────────────────────────────────────
   const [manicuristFilter, setManicuristFilter] = useState<string>(lockedManicuristId ?? "");
@@ -106,11 +120,11 @@ export default function NewAppointmentButton({
   const [pickerDate, setPickerDate] = useState<string>("");
 
   const loadSlotsNext = useCallback(
-    async (serviceId: string, manicuristId: string, signal: AbortSignal) => {
-      if (!serviceId) { setSlotOptions([]); return; }
+    async (serviceId: string, duration: number, manicuristId: string, signal: AbortSignal) => {
+      if (!serviceId || duration < 1) { setSlotOptions([]); return; }
       setLoadingSlots(true);
       try {
-        const params = new URLSearchParams({ serviceId, limit: "3" });
+        const params = new URLSearchParams({ serviceId, duration: String(duration), limit: "3" });
         if (manicuristId) params.set("manicuristId", manicuristId);
         const res  = await fetch(`/api/appointments/availability/next?${params}`, { signal });
         const data = await res.json();
@@ -135,8 +149,8 @@ export default function NewAppointmentButton({
   );
 
   const loadSlotsForDate = useCallback(
-    async (serviceId: string, dateStr: string, manicuristId: string, signal: AbortSignal) => {
-      if (!serviceId || !dateStr) { setSlotOptions([]); return; }
+    async (serviceId: string, duration: number, dateStr: string, manicuristId: string, signal: AbortSignal) => {
+      if (!serviceId || duration < 1 || !dateStr) { setSlotOptions([]); return; }
       setLoadingSlots(true);
       try {
         const manicuristIds = manicuristId
@@ -147,6 +161,7 @@ export default function NewAppointmentButton({
           if (signal.aborted) break;
           const params = new URLSearchParams({
             serviceId,
+            duration: String(duration),
             date: dateStr,
             manicuristId: mid,
           });
@@ -180,14 +195,15 @@ export default function NewAppointmentButton({
 
   useEffect(() => {
     const controller = new AbortController();
-    const serviceId = watchService ?? "";
+    const serviceId = firstServiceId;
+    const duration = totalDuration;
     if (pickerDate) {
-      loadSlotsForDate(serviceId, pickerDate, manicuristFilter, controller.signal);
+      loadSlotsForDate(serviceId, duration, pickerDate, manicuristFilter, controller.signal);
     } else {
-      loadSlotsNext(serviceId, manicuristFilter, controller.signal);
+      loadSlotsNext(serviceId, duration, manicuristFilter, controller.signal);
     }
     return () => controller.abort();
-  }, [watchService, manicuristFilter, pickerDate, loadSlotsNext, loadSlotsForDate]);
+  }, [firstServiceId, totalDuration, manicuristFilter, pickerDate, loadSlotsNext, loadSlotsForDate]);
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
   function formatSlot(s: SlotOption) {
@@ -205,6 +221,8 @@ export default function NewAppointmentButton({
 
   function openDrawer() {
     reset();
+    setSelectedServices([]);
+    setPriceOverride(null);
     setManicuristFilter(lockedManicuristId ?? "");
     setPickerDate("");
     setSlotOptions([]);
@@ -273,17 +291,21 @@ export default function NewAppointmentButton({
   // ── Submit ──────────────────────────────────────────────────────────────────
   async function onSubmit(data: FormData) {
     setError(null);
-    if (!data.startAt || !data.manicuristId || !data.clientId || !data.serviceId) {
-      setError(g(settings, "validation.fillAll", "Completá cliente, servicio y horario."));
+    if (!data.startAt || !data.manicuristId || !data.clientId || selectedServices.length === 0) {
+      setError(g(settings, "validation.fillAll", "Completá cliente, al menos un servicio y horario."));
       return;
     }
     try {
       const body = {
         clientId: data.clientId,
         manicuristId: data.manicuristId,
-        serviceId: data.serviceId,
+        services: selectedServices.map((s) => ({
+          serviceId: s.serviceId,
+          ...(s.durationMinutes && { durationMinutes: s.durationMinutes }),
+        })),
         startAt: new Date(data.startAt).toISOString(),
         notes: data.notes,
+        price: finalPrice,
       };
       const res = await fetch("/api/appointments", {
         method: "POST",
@@ -483,44 +505,118 @@ export default function NewAppointmentButton({
                 )}
               </div>
 
-              {/* Service */}
+              {/* Services (múltiples + duración personalizable) */}
               <div className="border-t border-[#f0ede8] pt-5">
                 <h3 className="text-[10px] font-bold text-primary-dark uppercase tracking-widest flex items-center gap-1.5 mb-4">
                   <span className="material-symbols-outlined text-[14px]">spa</span>
                   {g(settings, "form.section.service", "Servicio")}
                 </h3>
                 <div className="space-y-3">
-                  <div>
-                    <label className={labelCls}>{g(settings, "form.serviceType", "Tipo de servicio")}</label>
-                    <select {...register("serviceId")} className={inputCls}>
-                      <option value="">{g(settings, "form.selectService", "Seleccionar servicio...")}</option>
-                      {services.map((s) => (
-                        <option key={s.id} value={s.id}>{s.name} ({s.duration} {g(settings, "common.minutes", "min")})</option>
-                      ))}
-                    </select>
-                    {errors.serviceId && <p className="text-red-500 text-xs mt-1">{g(settings, "validation.selectService", "Seleccioná un servicio")}</p>}
-                  </div>
-
-                  {selectedService && (
-                    <div className="bg-primary/5 rounded-xl border border-primary/20 p-4 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-white shadow-warm-sm flex items-center justify-center">
-                          <span className="material-symbols-outlined text-primary-dark text-[18px]">schedule</span>
+                  {selectedServices.map((item, idx) => {
+                    const svc = services.find((s) => s.id === item.serviceId);
+                    const dur = item.durationMinutes ?? svc?.duration ?? 0;
+                    return (
+                      <div
+                        key={`${item.serviceId}-${idx}`}
+                        className="flex items-center gap-2 p-3 rounded-xl border border-primary/20 bg-primary/5"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-earth truncate">{svc?.name ?? "—"}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[10px] text-earth-muted">{g(settings, "form.field.duration", "Duración")}:</span>
+                            <input
+                              type="number"
+                              min={5}
+                              max={480}
+                              step={5}
+                              value={dur}
+                              onChange={(e) => {
+                                const v = parseInt(e.target.value, 10);
+                                if (!Number.isNaN(v)) {
+                                  setSelectedServices((prev) =>
+                                    prev.map((s, i) =>
+                                      i === idx ? { ...s, durationMinutes: v } : s
+                                    )
+                                  );
+                                }
+                              }}
+                              className="w-16 px-2 py-1 text-xs border border-[#D7CCC8] rounded bg-white"
+                            />
+                            <span className="text-[10px] text-earth-muted">{g(settings, "common.minutes", "min")}</span>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-[10px] text-earth-muted font-medium">{g(settings, "form.field.duration", "Duración")}</p>
-                          <p className="text-sm font-bold text-earth">{selectedService.duration} {g(settings, "common.minutes", "min")}</p>
+                        <span className="text-sm font-bold text-earth shrink-0">{formatPrice(svc ? Number(svc.price) : 0, settings)}</span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedServices((prev) => prev.filter((_, i) => i !== idx))}
+                          className="p-1.5 rounded-lg hover:bg-red-100 text-earth-muted hover:text-red-600 transition"
+                          title="Quitar"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">close</span>
+                        </button>
+                      </div>
+                    );
+                  })}
+                  <select
+                    value=""
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      if (id) {
+                        setSelectedServices((prev) => [...prev, { serviceId: id }]);
+                        e.target.value = "";
+                      }
+                    }}
+                    className={inputCls}
+                  >
+                    <option value="">+ {g(settings, "form.addService", "Agregar servicio")}</option>
+                    {services
+                      .filter((s) => !selectedServices.some((x) => x.serviceId === s.id))
+                      .map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name} ({s.duration} {g(settings, "common.minutes", "min")})
+                        </option>
+                      ))}
+                  </select>
+                  {selectedServices.length > 0 && (
+                    <div className="bg-primary/5 rounded-xl border border-primary/20 p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-full bg-white shadow-warm-sm flex items-center justify-center">
+                            <span className="material-symbols-outlined text-primary-dark text-[18px]">schedule</span>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-earth-muted font-medium">{g(settings, "form.field.duration", "Duración total")}</p>
+                            <p className="text-sm font-bold text-earth">{totalDuration} {g(settings, "common.minutes", "min")}</p>
+                          </div>
+                        </div>
+                        <div className="w-px h-8 bg-[#e6d5c3]" />
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-full bg-white shadow-warm-sm flex items-center justify-center">
+                            <span className="material-symbols-outlined text-emerald-600 text-[18px]">payments</span>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-earth-muted font-medium">{g(settings, "form.field.total", "Total")}</p>
+                            <p className="text-sm font-bold text-earth">{formatPrice(totalPrice, settings)}</p>
+                          </div>
                         </div>
                       </div>
-                      <div className="w-px h-8 bg-[#e6d5c3]" />
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-white shadow-warm-sm flex items-center justify-center">
-                          <span className="material-symbols-outlined text-emerald-600 text-[18px]">payments</span>
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-earth-muted font-medium">{g(settings, "form.field.total", "Total")}</p>
-                          <p className="text-sm font-bold text-earth">{formatPrice(Number(selectedService.price), settings)}</p>
-                        </div>
+                      <div>
+                        <label className="text-[10px] text-earth-muted font-medium block mb-1">
+                          {g(settings, "form.field.priceOverride", "Precio para esta cita")}
+                          <span className="text-earth-muted/70 ml-1">({g(settings, "form.field.priceOverrideHelp", "diseño extra, adicionales")})</span>
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          step={0.01}
+                          value={finalPrice}
+                          onChange={(e) => {
+                            const v = parseFloat(e.target.value);
+                            setPriceOverride(Number.isNaN(v) ? null : v);
+                          }}
+                          className="w-full px-3 py-2 text-sm border border-[#D7CCC8] rounded-lg bg-white"
+                          placeholder={String(totalPrice)}
+                        />
                       </div>
                     </div>
                   )}
@@ -589,12 +685,12 @@ export default function NewAppointmentButton({
                     <select
                       value={watch("startAt") ?? ""}
                       onChange={(e) => handleSlotChange(e.target.value)}
-                      disabled={!watchService || loadingSlots}
-                      className={cn(inputCls, (!watchService || loadingSlots) && "opacity-60 cursor-not-allowed")}
+                      disabled={selectedServices.length === 0 || loadingSlots}
+                      className={cn(inputCls, (selectedServices.length === 0 || loadingSlots) && "opacity-60 cursor-not-allowed")}
                     >
                       <option value="">
-                        {!watchService
-                          ? g(settings, "message.selectServiceFirst", "Elegí un servicio primero")
+                        {selectedServices.length === 0
+                          ? g(settings, "message.selectServiceFirst", "Elegí al menos un servicio primero")
                           : loadingSlots
                             ? g(settings, "message.searchingSlots", "Buscando turnos...")
                             : slotOptions.length === 0

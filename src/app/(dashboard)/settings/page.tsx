@@ -32,20 +32,18 @@ export default async function SettingsPage() {
         </Link>
       </div>
 
-      {process.env.WHATSAPP_PROVIDER === "evolution" && (
-        <div className="rounded-xl border border-[#e6d5c3] bg-[#fbf6f1] p-5">
-          <p className="text-sm text-[#7f6a5d]">
-            Para configurar recordatorios y mensajes por WhatsApp, vinculá tu número y personalizá las plantillas en la página dedicada.
-          </p>
-          <Link
-            href="/whatsapp"
-            className="inline-flex items-center gap-2 mt-3 px-4 py-2.5 rounded-lg bg-[#7f5539] text-white text-sm font-semibold hover:bg-[#6d4a32] transition-colors"
-          >
-            <span className="material-symbols-outlined text-[20px]">smartphone</span>
-            Configurar WhatsApp
-          </Link>
-        </div>
-      )}
+      <div className="rounded-xl border border-[#e6d5c3] bg-[#fbf6f1] p-5">
+        <p className="text-sm text-[#7f6a5d]">
+          Para configurar recordatorios y mensajes por WhatsApp (Meta Cloud API), personalizá las plantillas en la página dedicada.
+        </p>
+        <Link
+          href="/whatsapp"
+          className="inline-flex items-center gap-2 mt-3 px-4 py-2.5 rounded-lg bg-[#7f5539] text-white text-sm font-semibold hover:bg-[#6d4a32] transition-colors"
+        >
+          <span className="material-symbols-outlined text-[20px]">smartphone</span>
+          Configurar WhatsApp
+        </Link>
+      </div>
 
       <div className="rounded-xl border border-[#e6d5c3] bg-[#fbf6f1] p-5">
         <p className="text-sm text-[#7f6a5d]">

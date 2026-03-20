@@ -7,6 +7,7 @@
 #   bash setup-server.sh deploy "ssh-ed25519 AAAA... user@mac"
 # =============================================================================
 set -euo pipefail
+export DEBIAN_FRONTEND=noninteractive
 
 # ── Argumentos ────────────────────────────────────────────────────────────────
 NEW_USER="${1:-deploy}"
@@ -25,14 +26,15 @@ echo "============================================="
 echo ""
 
 # ── 1. Actualizar sistema ──────────────────────────────────────────────────────
-echo "[1/8] Actualizando paquetes..."
-apt-get update -qq && apt-get upgrade -y -qq
+echo "[1/9] Actualizando paquetes..."
+apt-get update -qq
+apt-get upgrade -y -o Dpkg::Options::="--force-confold" -qq
 apt-get install -y -qq \
   curl wget git ufw fail2ban unattended-upgrades \
   ca-certificates gnupg lsb-release
 
 # ── 2. Crear usuario no-root ───────────────────────────────────────────────────
-echo "[2/8] Creando usuario '$NEW_USER'..."
+echo "[2/9] Creando usuario '$NEW_USER'..."
 if ! id "$NEW_USER" &>/dev/null; then
   useradd -m -s /bin/bash -G sudo "$NEW_USER"
   echo "$NEW_USER ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/$NEW_USER"
@@ -48,24 +50,22 @@ chown -R "$NEW_USER:$NEW_USER" "/home/$NEW_USER/.ssh"
 echo "   SSH key agregada para $NEW_USER"
 
 # ── 3. Hardening SSH ──────────────────────────────────────────────────────────
-echo "[3/8] Configurando SSH seguro..."
-SSH_CONFIG="/etc/ssh/sshd_config"
-cp "$SSH_CONFIG" "${SSH_CONFIG}.bak"
-
-sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin no/' "$SSH_CONFIG"
-sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' "$SSH_CONFIG"
-sed -i 's/^#\?PubkeyAuthentication.*/PubkeyAuthentication yes/' "$SSH_CONFIG"
-sed -i 's/^#\?X11Forwarding.*/X11Forwarding no/' "$SSH_CONFIG"
-
-# Agregar si no existen
-grep -q "^PermitRootLogin" "$SSH_CONFIG"         || echo "PermitRootLogin no"         >> "$SSH_CONFIG"
-grep -q "^PasswordAuthentication" "$SSH_CONFIG"  || echo "PasswordAuthentication no"  >> "$SSH_CONFIG"
-grep -q "^PubkeyAuthentication" "$SSH_CONFIG"    || echo "PubkeyAuthentication yes"   >> "$SSH_CONFIG"
-
-systemctl restart ssh
+# Aplicamos hardening: solo claves SSH, sin root login.
+# IMPORTANTE: Verificá que podés conectar como $NEW_USER antes de ejecutar esto.
+# Si pasás APPLY_SSH_HARDENING=0, se salta este paso.
+echo "[3/9] Hardening SSH..."
+if [[ "${APPLY_SSH_HARDENING:-1}" == "1" ]]; then
+  sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config
+  sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
+  sed -i 's/^#\?PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config
+  systemctl restart ssh
+  echo "   Root login y contraseñas deshabilitados. Solo SSH por clave."
+else
+  echo "   Saltado (APPLY_SSH_HARDENING=0). Ejecutá manualmente después de verificar acceso."
+fi
 
 # ── 4. Firewall UFW ───────────────────────────────────────────────────────────
-echo "[4/8] Configurando firewall UFW..."
+echo "[4/9] Configurando firewall UFW..."
 ufw --force reset
 ufw default deny incoming
 ufw default allow outgoing
@@ -75,12 +75,12 @@ ufw allow 443/tcp comment "HTTPS"
 ufw --force enable
 echo "   UFW habilitado. Puertos abiertos: 22, 80, 443"
 
-# ── 5. Fail2ban ───────────────────────────────────────────────────────────────
-echo "[5/8] Configurando Fail2ban..."
+# ── 5. Fail2ban (estricto: 24h ban, 3 intentos) ───────────────────────────────
+echo "[5/9] Configurando Fail2ban (bantime 24h)..."
 cat > /etc/fail2ban/jail.local <<'EOF'
 [DEFAULT]
-bantime  = 3600
-findtime = 600
+bantime  = 86400
+findtime = 300
 maxretry = 3
 ignoreip = 127.0.0.1/8
 
@@ -92,7 +92,7 @@ systemctl enable fail2ban
 systemctl restart fail2ban
 
 # ── 6. Actualizaciones automáticas de seguridad ───────────────────────────────
-echo "[6/8] Habilitando actualizaciones automáticas de seguridad..."
+echo "[6/9] Habilitando actualizaciones automáticas de seguridad..."
 cat > /etc/apt/apt.conf.d/20auto-upgrades <<'EOF'
 APT::Periodic::Update-Package-Lists "1";
 APT::Periodic::Unattended-Upgrade "1";
@@ -100,7 +100,7 @@ APT::Periodic::AutocleanInterval "7";
 EOF
 
 # ── 7. Instalar Docker ────────────────────────────────────────────────────────
-echo "[7/8] Instalando Docker..."
+echo "[7/9] Instalando Docker..."
 if ! command -v docker &>/dev/null; then
   install -m 0755 -d /etc/apt/keyrings
   curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
@@ -123,7 +123,17 @@ fi
 usermod -aG docker "$NEW_USER"
 systemctl enable docker
 
-# ── 8. Resumen ────────────────────────────────────────────────────────────────
+# ── 8. Verificar que Redis/Postgres no estén expuestos ────────────────────────
+echo "[8/8] Verificando puertos expuestos..."
+EXPOSED=$(ss -tlnp 2>/dev/null | grep -E ':(6379|5432)\s' || true)
+if [[ -n "$EXPOSED" ]]; then
+  echo "   ADVERTENCIA: Redis (6379) o Postgres (5432) podrían estar expuestos."
+  echo "   Asegurate de que docker-compose NO mapee esos puertos al host."
+else
+  echo "   OK: Redis y Postgres no expuestos en el host."
+fi
+
+# ── 9. Resumen ────────────────────────────────────────────────────────────────
 echo ""
 echo "============================================="
 echo "  Servidor listo!"
@@ -131,16 +141,15 @@ echo "============================================="
 echo ""
 echo "  Usuario:        $NEW_USER"
 echo "  SSH key:        configurada"
-echo "  Root login:     DESHABILITADO"
-echo "  Contraseña SSH: DESHABILITADA"
+echo "  Root login:     deshabilitado"
+echo "  Contraseña SSH: deshabilitada"
 echo "  UFW:            activo (22, 80, 443)"
-echo "  Fail2ban:       activo"
+echo "  Fail2ban:       activo (ban 24h, 3 intentos)"
 echo "  Docker:         instalado"
 echo ""
-echo "  Próximo paso — conectate como $NEW_USER y corre deploy.sh:"
+echo "  Próximo paso — conectate como $NEW_USER y corre deploy:"
 echo "    ssh $NEW_USER@<IP>"
-echo "    bash deploy.sh"
+echo "    bash scripts/deploy.sh"
 echo ""
-echo "  IMPORTANTE: Verifica que puedes conectarte con SSH key"
-echo "  ANTES de cerrar esta sesión root."
+echo "  O usa full-deploy.sh para todo en un solo paso."
 echo ""

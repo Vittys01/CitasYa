@@ -5,10 +5,8 @@ x-app-env: &app-env
   AUTH_SECRET:             ${AUTH_SECRET:-change-me-in-production-min-32-chars}
   NEXT_PUBLIC_APP_URL:     ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
   AUTH_URL:                ${AUTH_URL:-http://localhost:3000}
-  WHATSAPP_PROVIDER:       ${WHATSAPP_PROVIDER:-evolution}
-  EVOLUTION_API_URL:       ${EVOLUTION_API_URL:-http://evolution:8080}
-  EVOLUTION_API_KEY:       ${EVOLUTION_API_KEY:-evolution_secret}
-  EVOLUTION_INSTANCE:      ${EVOLUTION_INSTANCE:-dates-instance}
+  META_WHATSAPP_TOKEN:     ${META_WHATSAPP_TOKEN:-}
+  META_PHONE_NUMBER_ID:    ${META_PHONE_NUMBER_ID:-}
   REMINDER_HOURS_BEFORE:   ${REMINDER_HOURS_BEFORE:-24}
 
 services:
@@ -76,8 +74,6 @@ services:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
-      evolution:
-        condition: service_started
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000/api/auth/session || exit 1"]
       interval: 30s
@@ -98,37 +94,6 @@ services:
       redis:
         condition: service_healthy
 
-  # ── Evolution API (WhatsApp) ─────────────────────────────────────────────────
-  # La app Next.js debe usar EVOLUTION_API_KEY = mismo valor que AUTHENTICATION_API_KEY.
-  # Con app en host: EVOLUTION_API_URL=http://localhost:8080; con app en Docker: usa http://evolution:8080 (x-app-env).
-  evolution:
-    image: atendai/evolution-api:v2.2.3
-    restart: unless-stopped
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
-    environment:
-      SERVER_URL:                http://evolution:8080
-      AUTHENTICATION_API_KEY:    evolution_secret
-      CORS_ORIGIN:               "*"
-      WEBSOCKET_ENABLED:         "true"
-      WEBSOCKET_GLOBAL_EVENTS:   "true"
-      DATABASE_ENABLED:          "true"
-      DATABASE_PROVIDER:         postgresql
-      DATABASE_CONNECTION_URI:   postgresql://dates_user:dates_pass@postgres:5432/dates_db?schema=public
-      DATABASE_CONNECTION_CLIENT_NAME: evolution_exchange
-      CACHE_REDIS_ENABLED:       "true"
-      CACHE_REDIS_URI:           redis://redis:6379
-    volumes:
-      - evolution_data:/evolution/instances
-    # No public ports — app connects via internal Docker network as http://evolution:8080
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-
 volumes:
   postgres_data:
   redis_data:
-  evolution_data:

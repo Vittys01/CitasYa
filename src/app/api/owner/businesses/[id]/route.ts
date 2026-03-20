@@ -27,7 +27,7 @@ const updateSchema = z.object({
     .optional(),
   isActive: z.boolean().optional(),
   // WhatsApp
-  whatsappProvider: z.enum(["evolution", "meta", ""]).optional(),
+  whatsappProvider: z.enum(["meta", ""]).optional(),
   whatsappInstanceName: z.string().max(100).optional().nullable(),
   metaPhoneNumberId: z.string().max(100).optional().nullable(),
   metaAccessToken: z.string().max(500).optional().nullable(),

@@ -188,9 +188,7 @@ export default async function BusinessDetailPage({
             <div>
               <p className="text-xs font-semibold text-green-700">WhatsApp configurado</p>
               <p className="text-xs text-green-600">
-                {business.whatsappProvider === "evolution"
-                  ? `Evolution API · instancia: ${business.whatsappInstanceName ?? "—"}`
-                  : `Meta Cloud API · ID: ${business.metaPhoneNumberId ?? "—"}`}
+                Meta Cloud API{business.metaPhoneNumberId ? ` · ID: ${business.metaPhoneNumberId}` : ""}
               </p>
             </div>
             <Link

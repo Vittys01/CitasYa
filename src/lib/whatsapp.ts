@@ -1,11 +1,5 @@
 /**
- * WhatsApp abstraction layer.
- *
- * Supports two providers via WHATSAPP_PROVIDER env var:
- *   - "evolution"  → Evolution API (self-hosted, open-source)
- *   - "meta"       → Meta Cloud API (official, requires approval)
- *
- * To add a new provider: implement the WhatsAppProvider interface below.
+ * WhatsApp abstraction layer — Meta Cloud API only.
  */
 
 export interface WhatsAppMessage {
@@ -23,58 +17,15 @@ interface WhatsAppProvider {
   sendText(msg: WhatsAppMessage): Promise<WhatsAppSendResult>;
 }
 
-// ─── Evolution API Provider ───────────────────────────────────────────────────
-
-class EvolutionProvider implements WhatsAppProvider {
-  private readonly baseUrl: string;
-  private readonly apiKey: string;
-  private readonly instance: string;
-
-  constructor(instanceName?: string) {
-    this.baseUrl = process.env.EVOLUTION_API_URL ?? "http://localhost:8080";
-    this.apiKey = process.env.EVOLUTION_API_KEY ?? "";
-    this.instance = instanceName ?? process.env.EVOLUTION_INSTANCE ?? "default";
-  }
-
-  async sendText({ to, body }: WhatsAppMessage): Promise<WhatsAppSendResult> {
-    try {
-      const res = await fetch(
-        `${this.baseUrl}/message/sendText/${this.instance}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            apikey: this.apiKey,
-          },
-          body: JSON.stringify({
-            number: to.replace("+", ""),
-            text: body,
-          }),
-        }
-      );
-
-      if (!res.ok) {
-        const text = await res.text();
-        return { success: false, error: `Evolution API error ${res.status}: ${text}` };
-      }
-
-      const data = (await res.json()) as { key?: { id?: string }; id?: string };
-      return { success: true, externalId: data?.key?.id ?? data?.id };
-    } catch (err) {
-      return { success: false, error: String(err) };
-    }
-  }
-}
-
 // ─── Meta Cloud API Provider ──────────────────────────────────────────────────
 
 class MetaProvider implements WhatsAppProvider {
   private readonly token: string;
   private readonly phoneNumberId: string;
 
-  constructor() {
-    this.token = process.env.META_WHATSAPP_TOKEN ?? "";
-    this.phoneNumberId = process.env.META_PHONE_NUMBER_ID ?? "";
+  constructor(config?: { token?: string; phoneNumberId?: string }) {
+    this.token = config?.token ?? process.env.META_WHATSAPP_TOKEN ?? "";
+    this.phoneNumberId = config?.phoneNumberId ?? process.env.META_PHONE_NUMBER_ID ?? "";
   }
 
   async sendText({ to, body }: WhatsAppMessage): Promise<WhatsAppSendResult> {
@@ -115,17 +66,23 @@ class MetaProvider implements WhatsAppProvider {
 
 // ─── Factory ──────────────────────────────────────────────────────────────────
 
-function createProvider(instanceName?: string): WhatsAppProvider {
-  const provider = process.env.WHATSAPP_PROVIDER ?? "evolution";
-  if (provider === "meta") return new MetaProvider();
-  return new EvolutionProvider(instanceName);
-}
+export const whatsapp = new MetaProvider();
 
-export const whatsapp = createProvider();
-
-/** Provider for a given Evolution instance (e.g. per-business). Falls back to default env instance if no name. */
-export function getProviderForInstance(instanceName: string | null | undefined): WhatsAppProvider {
-  return createProvider(instanceName ?? undefined);
+/** Provider for a given business. Uses per-business Meta config if available, else env vars. */
+export function getProviderForBusiness(business: {
+  whatsappProvider?: string | null;
+  metaPhoneNumberId?: string | null;
+  metaAccessToken?: string | null;
+} | null): WhatsAppProvider {
+  if (!business || business.whatsappProvider !== "meta") {
+    return new MetaProvider();
+  }
+  const token = business.metaAccessToken?.trim();
+  const phoneId = business.metaPhoneNumberId?.trim();
+  if (token && phoneId) {
+    return new MetaProvider({ token, phoneNumberId: phoneId });
+  }
+  return new MetaProvider();
 }
 
 // ─── Message templates ────────────────────────────────────────────────────────

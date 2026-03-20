@@ -52,9 +52,9 @@ model Business {
   ownerId   String
   owner     User     @relation("BusinessOwner", fields: [ownerId], references: [id], onDelete: Cascade)
 
-  // WhatsApp: one instance per business (Evolution instance name or Meta config)
-  whatsappProvider       String?  // "evolution" | "meta"
-  whatsappInstanceName    String? // Evolution: e.g. "empresa-1"
+  // WhatsApp (Meta Cloud API)
+  whatsappProvider       String?  // "meta"
+  whatsappInstanceName    String? // Deprecated (legacy)
   metaPhoneNumberId      String?
   metaAccessToken        String?
 
@@ -172,10 +172,27 @@ model Service {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  appointments Appointment[]
+  appointments       Appointment[]
+  appointmentServices AppointmentService[]
 
   @@index([businessId])
   @@index([isActive])
+}
+
+// ─── AppointmentService (múltiples servicios por cita, duración personalizable) ─
+
+model AppointmentService {
+  id              String   @id @default(cuid())
+  appointmentId   String
+  appointment     Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  serviceId       String
+  service         Service   @relation(fields: [serviceId], references: [id])
+  durationMinutes Int?      // null = usar service.duration
+  price           Decimal   @db.Decimal(10, 2)
+  sortOrder       Int       @default(0)
+
+  @@index([appointmentId])
+  @@index([serviceId])
 }
 
 // ─── Clients ──────────────────────────────────────────────────────────────────
@@ -220,6 +237,7 @@ model Appointment {
   updatedAt   DateTime          @updatedAt
 
   notifications Notification[]
+  services      AppointmentService[]
 
   @@index([businessId])
   @@index([manicuristId, startAt])

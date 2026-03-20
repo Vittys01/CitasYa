@@ -16,6 +16,7 @@ import {
   enqueueCancellation,
   scheduleReminder,
 } from "@/lib/queue";
+import { processNotification } from "@/services/notification.service";
 import type {
   CreateAppointmentInput,
   UpdateAppointmentInput,
@@ -113,12 +114,39 @@ export async function clientHasOverlappingAppointment(
 export async function createAppointment(
   input: CreateAppointmentInput
 ): Promise<AppointmentWithRelations> {
-  const service = await prisma.service.findUniqueOrThrow({
-    where: { id: input.serviceId },
+  const serviceItems = input.services?.length
+    ? input.services
+    : input.serviceId
+      ? [{ serviceId: input.serviceId }]
+      : [];
+
+  if (serviceItems.length === 0) {
+    throw new Error("Debe indicar al menos un servicio.");
+  }
+
+  const servicesData = await prisma.service.findMany({
+    where: { id: { in: serviceItems.map((s) => s.serviceId) } },
   });
+  const serviceMap = new Map(servicesData.map((s) => [s.id, s]));
+
+  let totalDuration = 0;
+  let totalPrice = 0;
+  const firstServiceId = serviceItems[0].serviceId;
+  const businessId = serviceMap.get(firstServiceId)?.businessId;
+  if (!businessId) throw new Error("Servicio no encontrado.");
+
+  for (const item of serviceItems) {
+    const svc = serviceMap.get(item.serviceId);
+    if (!svc) throw new Error(`Servicio ${item.serviceId} no encontrado.`);
+    const dur = item.durationMinutes ?? svc.duration;
+    totalDuration += dur;
+    totalPrice += Number(svc.price);
+  }
+
+  const finalPrice = input.price != null && input.price >= 0 ? input.price : totalPrice;
 
   const startAt = new Date(input.startAt);
-  const endAt = calcEndTime(startAt, service.duration);
+  const endAt = calcEndTime(startAt, totalDuration);
 
   const available = await isSlotAvailable(input.manicuristId, startAt, endAt);
   if (!available) {
@@ -137,20 +165,31 @@ export async function createAppointment(
 
   const appointment = await prisma.appointment.create({
     data: {
-      businessId: service.businessId,
+      businessId,
       clientId: input.clientId,
       manicuristId: input.manicuristId,
-      serviceId: input.serviceId,
+      serviceId: firstServiceId,
       startAt,
       endAt,
-      price: service.price,
+      price: finalPrice,
       notes: input.notes,
       status: "PENDING",
+      services: {
+        create: serviceItems.map((item, i) => {
+          const svc = serviceMap.get(item.serviceId)!;
+          const dur = item.durationMinutes ?? svc.duration;
+          return {
+            serviceId: item.serviceId,
+            durationMinutes: item.durationMinutes ?? null,
+            price: svc.price,
+            sortOrder: i,
+          };
+        }),
+      },
     },
     include: appointmentInclude,
   });
 
-  // Fire-and-forget queue jobs (don't block response)
   void enqueueConfirmation(appointment.id);
   void scheduleReminder(appointment.id, startAt);
 
@@ -162,17 +201,31 @@ export async function createAppointment(
 export async function updateAppointment(
   id: string,
   input: UpdateAppointmentInput
-): Promise<AppointmentWithRelations> {
+): Promise<AppointmentWithRelations | null> {
+  if (input.status === "CANCELLED") {
+    await cancelAppointment(id);
+    return null;
+  }
+
   const existing = await prisma.appointment.findUniqueOrThrow({ where: { id } });
 
   let startAt = existing.startAt;
   let endAt = existing.endAt;
 
   if (input.startAt || input.serviceId) {
-    const serviceId = input.serviceId ?? existing.serviceId;
-    const service = await prisma.service.findUniqueOrThrow({ where: { id: serviceId } });
     startAt = input.startAt ? new Date(input.startAt) : existing.startAt;
-    endAt = calcEndTime(startAt, service.duration);
+    // Al reagendar (solo startAt), preservar duración actual
+    const existingDuration = Math.round(
+      (existing.endAt.getTime() - existing.startAt.getTime()) / 60000
+    );
+    if (input.serviceId) {
+      const service = await prisma.service.findUniqueOrThrow({
+        where: { id: input.serviceId },
+      });
+      endAt = calcEndTime(startAt, service.duration);
+    } else {
+      endAt = calcEndTime(startAt, existingDuration);
+    }
 
     const manicuristId = input.manicuristId ?? existing.manicuristId;
     const available = await isSlotAvailable(manicuristId, startAt, endAt, id);
@@ -198,26 +251,33 @@ export async function updateAppointment(
       ...(input.manicuristId && { manicuristId: input.manicuristId }),
       ...(input.serviceId && { serviceId: input.serviceId }),
       ...(input.startAt && { startAt, endAt }),
+      ...(input.price != null && input.price >= 0 && { price: input.price }),
     },
     include: appointmentInclude,
   });
 
-  // If cancelled, enqueue cancellation message
-  if (input.status === "CANCELLED") {
-    void enqueueCancellation(id);
-  }
-
   return updated as AppointmentWithRelations;
 }
 
-// ─── Cancel ───────────────────────────────────────────────────────────────────
+// ─── Cancel (delete) ─────────────────────────────────────────────────────────
 
 export async function cancelAppointment(id: string): Promise<void> {
-  await prisma.appointment.update({
+  const appointment = await prisma.appointment.findUnique({
     where: { id },
-    data: { status: "CANCELLED" },
+    include: {
+      client: true,
+      service: true,
+      manicurist: { include: { user: true } },
+    },
   });
-  void enqueueCancellation(id);
+  if (!appointment) return;
+
+  const { remindersQueue } = await import("@/lib/queue");
+  const pendingReminder = await remindersQueue.getJob(`reminder-${id}`);
+  if (pendingReminder) await pendingReminder.remove();
+
+  await processNotification(id, "CANCELLATION");
+  await prisma.appointment.delete({ where: { id } });
 }
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
@@ -398,4 +458,10 @@ const appointmentInclude = {
     include: { user: { select: { id: true, name: true, avatarUrl: true } } },
   },
   service: { select: { id: true, name: true, duration: true, color: true } },
+  services: {
+    orderBy: { sortOrder: "asc" },
+    include: {
+      service: { select: { id: true, name: true, duration: true, color: true } },
+    },
+  },
 } as const;

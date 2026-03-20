@@ -29,7 +29,11 @@ export async function GET(req: NextRequest) {
   const service = await prisma.service.findUnique({ where: { id: serviceId } });
   if (!service) return NextResponse.json(apiError("Servicio no encontrado"), { status: 404 });
 
-  // Parse YYYY-MM-DD as local date to avoid timezone shifting the day
+  const durationParam = searchParams.get("duration");
+  const duration = durationParam
+    ? Math.max(1, parseInt(durationParam, 10) || service.duration)
+    : service.duration;
+
   const dateLocal =
     /^\d{4}-\d{2}-\d{2}$/.test(date)
       ? (() => {
@@ -38,7 +42,7 @@ export async function GET(req: NextRequest) {
         })()
       : new Date(date);
 
-  const slots = await getAvailableSlots(manicuristId, dateLocal, service.duration);
+  const slots = await getAvailableSlots(manicuristId, dateLocal, duration);
 
   return NextResponse.json(
     apiSuccess(

@@ -35,7 +35,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(apiError("Servicio no pertenece a tu empresa"), { status: 403 });
     }
 
-    const duration = Number(service.duration);
+    const durationParam = searchParams.get("duration");
+    const duration = durationParam
+      ? Math.max(1, parseInt(durationParam, 10) || service.duration)
+      : Number(service.duration);
     if (!Number.isFinite(duration) || duration < 1) {
       return NextResponse.json(apiError("El servicio no tiene una duración válida"), { status: 422 });
     }
