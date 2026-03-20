@@ -61,7 +61,14 @@ export async function processNotification(
     getAppSettings(businessId),
     prisma.business.findUnique({
       where: { id: businessId },
-      select: { whatsappProvider: true, metaPhoneNumberId: true, metaAccessToken: true },
+      select: {
+        whatsappProvider: true,
+        metaPhoneNumberId: true,
+        metaAccessToken: true,
+        twilioAccountSid: true,
+        twilioAuthToken: true,
+        twilioWhatsAppNumber: true,
+      },
     }),
   ]);
   const provider = getProviderForBusiness(business);

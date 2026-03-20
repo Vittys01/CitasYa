@@ -28,6 +28,9 @@ export default async function EditBusinessPage({
         whatsappInstanceName: true,
         metaPhoneNumberId: true,
         metaAccessToken: true,
+        twilioAccountSid: true,
+        twilioAuthToken: true,
+        twilioWhatsAppNumber: true,
       },
     }),
     getAppSettings(id),
@@ -68,6 +71,9 @@ export default async function EditBusinessPage({
             whatsappInstanceName: business.whatsappInstanceName,
             metaPhoneNumberId: business.metaPhoneNumberId,
             metaAccessToken: business.metaAccessToken,
+            twilioAccountSid: business.twilioAccountSid,
+            twilioAuthToken: business.twilioAuthToken,
+            twilioWhatsAppNumber: business.twilioWhatsAppNumber,
             currency: settings["app.currency"] ?? "ARS",
           }}
         />

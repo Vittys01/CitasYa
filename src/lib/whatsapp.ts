@@ -1,5 +1,5 @@
 /**
- * WhatsApp abstraction layer — Meta Cloud API only.
+ * WhatsApp abstraction layer — Meta Cloud API & Twilio.
  */
 
 export interface WhatsAppMessage {
@@ -64,24 +64,96 @@ class MetaProvider implements WhatsAppProvider {
   }
 }
 
+// ─── Twilio Provider ───────────────────────────────────────────────────────────
+
+class TwilioProvider implements WhatsAppProvider {
+  private readonly accountSid: string;
+  private readonly authToken: string;
+  private readonly fromNumber: string; // "whatsapp:+14155238886"
+
+  constructor(config: { accountSid: string; authToken: string; fromNumber: string }) {
+    this.accountSid = config.accountSid;
+    this.authToken = config.authToken;
+    this.fromNumber = config.fromNumber.startsWith("whatsapp:") ? config.fromNumber : `whatsapp:${config.fromNumber}`;
+  }
+
+  async sendText({ to, body }: WhatsAppMessage): Promise<WhatsAppSendResult> {
+    try {
+      const toWhatsApp = to.startsWith("whatsapp:") ? to : `whatsapp:${to}`;
+      const url = `https://api.twilio.com/2010-04-01/Accounts/${this.accountSid}/Messages.json`;
+      const auth = Buffer.from(`${this.accountSid}:${this.authToken}`).toString("base64");
+      const form = new URLSearchParams({
+        From: this.fromNumber,
+        To: toWhatsApp,
+        Body: body,
+      });
+
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Authorization: `Basic ${auth}`,
+        },
+        body: form.toString(),
+      });
+
+      const data = (await res.json()) as { sid?: string; message?: string; code?: number };
+
+      if (!res.ok) {
+        return {
+          success: false,
+          error: `Twilio API error ${res.status}: ${data?.message ?? JSON.stringify(data)}`,
+        };
+      }
+
+      return { success: true, externalId: data?.sid };
+    } catch (err) {
+      return { success: false, error: String(err) };
+    }
+  }
+}
+
 // ─── Factory ──────────────────────────────────────────────────────────────────
 
 export const whatsapp = new MetaProvider();
 
-/** Provider for a given business. Uses per-business Meta config if available, else env vars. */
+/** Provider for a given business. Uses per-business config if available, else env vars. */
 export function getProviderForBusiness(business: {
   whatsappProvider?: string | null;
   metaPhoneNumberId?: string | null;
   metaAccessToken?: string | null;
+  twilioAccountSid?: string | null;
+  twilioAuthToken?: string | null;
+  twilioWhatsAppNumber?: string | null;
 } | null): WhatsAppProvider {
-  if (!business || business.whatsappProvider !== "meta") {
+  if (!business) {
     return new MetaProvider();
   }
-  const token = business.metaAccessToken?.trim();
-  const phoneId = business.metaPhoneNumberId?.trim();
-  if (token && phoneId) {
-    return new MetaProvider({ token, phoneNumberId: phoneId });
+
+  if (business.whatsappProvider === "twilio") {
+    const sid = business.twilioAccountSid?.trim();
+    const token = business.twilioAuthToken?.trim();
+    const from = business.twilioWhatsAppNumber?.trim();
+    if (sid && token && from) {
+      return new TwilioProvider({ accountSid: sid, authToken: token, fromNumber: from });
+    }
+    const envSid = process.env.TWILIO_ACCOUNT_SID;
+    const envToken = process.env.TWILIO_AUTH_TOKEN;
+    const envFrom = process.env.TWILIO_WHATSAPP_NUMBER;
+    if (envSid && envToken && envFrom) {
+      return new TwilioProvider({ accountSid: envSid, authToken: envToken, fromNumber: envFrom });
+    }
+    throw new Error("Twilio config incompleta: configurá Twilio en el negocio o en .env");
   }
+
+  if (business.whatsappProvider === "meta") {
+    const token = business.metaAccessToken?.trim();
+    const phoneId = business.metaPhoneNumberId?.trim();
+    if (token && phoneId) {
+      return new MetaProvider({ token, phoneNumberId: phoneId });
+    }
+  }
+
   return new MetaProvider();
 }
 

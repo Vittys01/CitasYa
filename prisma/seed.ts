@@ -67,32 +67,6 @@ async function main() {
 
   await prisma.user.create({
     data: {
-      email: "mafe@gmail.com",
-      password: maniPassword,
-      name: "Mafe",
-      role: Role.MANICURIST,
-      businessId,
-      isActive: true,
-      manicurist: {
-        create: {
-          businessId,
-          color: "#ec4899",
-          schedules: {
-            createMany: {
-              data: [1, 2, 3, 4, 5].map((day) => ({
-                dayOfWeek: day,
-                startTime: "09:00",
-                endTime: "18:00",
-              })),
-            },
-          },
-        },
-      },
-    },
-  });
-
-  await prisma.user.create({
-    data: {
       email: "paola@gmail.com",
       password: maniPassword,
       name: "Paola",
@@ -120,12 +94,12 @@ async function main() {
   // ── SERVICES ───────────────────────────────────────────────────────────────
   await prisma.service.createMany({
     data: [
-      { businessId, name: "Manicura clásica",         duration: 45,  price: 3500,  color: "#f472b6" },
-      { businessId, name: "Manicura semipermanente",   duration: 60,  price: 5500,  color: "#c084fc" },
-      { businessId, name: "Pedicura clásica",          duration: 60,  price: 4000,  color: "#60a5fa" },
-      { businessId, name: "Pedicura semipermanente",   duration: 75,  price: 6000,  color: "#34d399" },
-      { businessId, name: "Uñas acrílicas",            duration: 120, price: 9500,  color: "#fb923c" },
-      { businessId, name: "Nail art (diseño simple)",  duration: 30,  price: 1500,  color: "#fbbf24" },
+      { businessId, name: "Manicura clásica",         duration: 45,  price: 35,  color: "#f472b6" },
+      { businessId, name: "Manicura semipermanente",   duration: 60,  price: 35,  color: "#c084fc" },
+      { businessId, name: "Pedicura clásica",          duration: 60,  price: 40,  color: "#60a5fa" },
+      { businessId, name: "Pedicura semipermanente",   duration: 75,  price: 30,  color: "#34d399" },
+      { businessId, name: "Uñas acrílicas",            duration: 120, price: 35,  color: "#fb923c" },
+      { businessId, name: "Nail art (diseño simple)",  duration: 30,  price: 35,  color: "#fbbf24" },
     ],
   });
 
@@ -301,7 +275,6 @@ async function main() {
   console.log("─────────────────────────────────────");
   console.log("  OWNER:  bvittys@gmail.com    / 123vittyS");
   console.log("  ADMIN:  paolaLopez@gmail.com / Montecatini123");
-  console.log("  MANI:   mafe@gmail.com        / 123mani");
   console.log("  MANI:   paola@gmail.com       / 123mani");
   console.log("  Empresa: Montecatini (slug: montecatini)");
   console.log("─────────────────────────────────────");

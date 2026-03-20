@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { apiError, apiSuccess } from "@/lib/utils";
+import { apiError, apiSuccess, canAccessStaffFeatures } from "@/lib/utils";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 
@@ -48,7 +48,7 @@ export async function GET(_req: NextRequest) {
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json(apiError("Unauthorized"), { status: 401 });
-  if (session.user.role !== "ADMIN" && session.user.role !== "OWNER") {
+  if (!canAccessStaffFeatures(session.user.role)) {
     return NextResponse.json(apiError("Forbidden"), { status: 403 });
   }
   const businessId = session.user.businessId;

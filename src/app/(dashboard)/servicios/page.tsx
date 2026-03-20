@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { canAccessStaffFeatures } from "@/lib/utils";
 import { redirect } from "next/navigation";
 import { serializeServices } from "@/lib/serialize";
 import ServicesSettings from "@/components/settings/ServicesSettings";
@@ -8,7 +9,7 @@ import { getAppSettings } from "@/services/settings.service";
 export default async function ServiciosPage() {
   const session = await auth();
   if (!session) redirect("/login");
-  if (session.user.role !== "ADMIN" && session.user.role !== "OWNER") redirect("/dashboard");
+  if (!canAccessStaffFeatures(session.user.role)) redirect("/dashboard");
   const businessId = session.user.businessId!;
 
   const [settings, services] = await Promise.all([

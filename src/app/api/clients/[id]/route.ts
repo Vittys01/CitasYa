@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { apiError, apiSuccess } from "@/lib/utils";
+import { apiError, apiSuccess, canAccessStaffFeatures } from "@/lib/utils";
 import { getClientById, updateClient, deleteClient } from "@/services/client.service";
 import { z } from "zod";
 
@@ -52,7 +52,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   if (!session) return NextResponse.json(apiError("Unauthorized"), { status: 401 });
 
   // Only admins/owners can delete clients
-  if (session.user.role !== "ADMIN" && session.user.role !== "OWNER") {
+  if (!canAccessStaffFeatures(session.user.role)) {
     return NextResponse.json(apiError("Forbidden", "FORBIDDEN"), { status: 403 });
   }
 

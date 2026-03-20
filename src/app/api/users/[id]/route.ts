@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { apiError, apiSuccess } from "@/lib/utils";
+import { apiError, apiSuccess, canAccessStaffFeatures } from "@/lib/utils";
 import { z } from "zod";
 
 const updateSchema = z.object({
@@ -18,7 +18,7 @@ type Params = { params: Promise<{ id: string }> };
 export async function PATCH(req: NextRequest, { params }: Params) {
   const session = await auth();
   if (!session) return NextResponse.json(apiError("Unauthorized"), { status: 401 });
-  if (session.user.role !== "ADMIN" && session.user.role !== "OWNER") {
+  if (!canAccessStaffFeatures(session.user.role)) {
     return NextResponse.json(apiError("Forbidden"), { status: 403 });
   }
 
@@ -42,7 +42,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 export async function DELETE(_req: NextRequest, { params }: Params) {
   const session = await auth();
   if (!session) return NextResponse.json(apiError("Unauthorized"), { status: 401 });
-  if (session.user.role !== "ADMIN" && session.user.role !== "OWNER") {
+  if (!canAccessStaffFeatures(session.user.role)) {
     return NextResponse.json(apiError("Forbidden"), { status: 403 });
   }
 

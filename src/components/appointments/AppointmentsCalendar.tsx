@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   format,
@@ -155,6 +155,18 @@ export default function AppointmentsCalendar({
     startOfWeek(new Date(), { weekStartsOn: 1 })
   );
   const [filterMani, setFilterMani] = useState<string>("all");
+  const mobileDefaultApplied = useRef(false);
+
+  // En móvil: por defecto vista día + una persona
+  useEffect(() => {
+    if (typeof window === "undefined" || mobileDefaultApplied.current) return;
+    const isMobile = window.innerWidth < 768;
+    if (isMobile && manicurists.length > 0) {
+      mobileDefaultApplied.current = true;
+      setView("day");
+      setFilterMani(manicurists[0].id);
+    }
+  }, [manicurists]);
   const [filterStatus, setFilterStatus] = useState<StatusFilter>("all");
   const [appointments, setAppointments] = useState<AppointmentForClient[]>(initialAppointments);
   const [fetchedByWeek, setFetchedByWeek] = useState<Record<string, AppointmentForClient[]>>({});
@@ -204,12 +216,10 @@ export default function AppointmentsCalendar({
   const [dropTargetDay, setDropTargetDay] = useState<Date | null>(null);
 
   const handleApptDrop = useCallback(
-    async (appointmentId: string, targetDay: Date) => {
+    async (appointmentId: string, targetStartAt: Date) => {
       const appt = displayAppointments.find((a) => a.id === appointmentId);
       if (!appt || appt.status === "CANCELLED" || appt.status === "COMPLETED") return;
-      const start = new Date(appt.startAt);
-      const newStart = new Date(targetDay);
-      newStart.setHours(start.getHours(), start.getMinutes(), 0, 0);
+      const newStart = new Date(targetStartAt);
       const durationMs = new Date(appt.endAt).getTime() - new Date(appt.startAt).getTime();
       const newEnd = new Date(newStart.getTime() + durationMs);
         const updated: AppointmentForClient = { ...appt, startAt: newStart.toISOString(), endAt: newEnd.toISOString() };
@@ -223,8 +233,9 @@ export default function AppointmentsCalendar({
           const j = await res.json();
           throw new Error(j.error?.message ?? "Error al mover");
         }
+        const start = new Date(appt.startAt);
         const sourceKey = format(startOfWeek(start, { weekStartsOn: 1 }), "yyyy-MM-dd");
-        const targetKey = format(startOfWeek(targetDay, { weekStartsOn: 1 }), "yyyy-MM-dd");
+        const targetKey = format(startOfWeek(newStart, { weekStartsOn: 1 }), "yyyy-MM-dd");
         setAppointments((prev) => {
           if (sourceKey === initialWeekStartKey && targetKey === initialWeekStartKey) {
             return prev.map((a) => (a.id === appointmentId ? updated : a));
@@ -858,7 +869,7 @@ function DayColumn({
   onEmptySlotClick?: (slot: EmptySlotPayload) => void;
   slotDay: Date;
   slotManicuristId?: string;
-  onApptDrop?: (appointmentId: string, targetDay: Date) => void;
+  onApptDrop?: (appointmentId: string, targetStartAt: Date) => void;
   draggingApptId?: string | null;
   setDraggingApptId?: (id: string | null) => void;
   dropTargetDay?: Date | null;
@@ -883,6 +894,21 @@ function DayColumn({
   );
 
   const isDropTarget = dropTargetDay && isSameDay(slotDay, dropTargetDay);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent<HTMLDivElement>) => {
+      if (!onApptDrop || !draggingApptId) return;
+      e.preventDefault();
+      const id = e.dataTransfer.getData("appointmentId");
+      if (!id) return;
+      const rect = e.currentTarget.getBoundingClientRect();
+      const offsetY = e.clientY - rect.top;
+      const targetStartAt = slotFromOffsetY(Math.max(0, Math.min(offsetY, gridHeight)), slotDay);
+      onApptDrop(id, targetStartAt);
+      setDropTargetDay?.(null);
+    },
+    [onApptDrop, draggingApptId, slotDay, gridHeight]
+  );
 
   return (
     <div
@@ -911,16 +937,7 @@ function DayColumn({
             }
           : undefined
       }
-      onDrop={
-        onApptDrop && draggingApptId
-          ? (e) => {
-              e.preventDefault();
-              const id = e.dataTransfer.getData("appointmentId");
-              if (id) onApptDrop(id, slotDay);
-              setDropTargetDay?.(null);
-            }
-          : undefined
-      }
+      onDrop={onApptDrop && draggingApptId ? handleDrop : undefined}
     >
       {workBands.map((band, i) => (
         <div

@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { auth } from "@/lib/auth";
+import { canAccessStaffFeatures } from "@/lib/utils";
 import { redirect } from "next/navigation";
 import CurrencySettings from "@/components/settings/CurrencySettings";
 import { getAppSettings } from "@/services/settings.service";
 
 export default async function SettingsPage() {
   const session = await auth();
-  if (session?.user.role !== "ADMIN" && session?.user.role !== "OWNER") redirect("/dashboard");
+  if (!session || !canAccessStaffFeatures(session.user.role)) redirect("/dashboard");
   const businessId = session?.user.businessId!;
   const settings = await getAppSettings(businessId);
 

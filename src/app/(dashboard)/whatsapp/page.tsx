@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import { canAccessStaffFeatures } from "@/lib/utils";
 import { redirect } from "next/navigation";
 import { getAppSettings } from "@/services/settings.service";
 import WhatsAppPageContent from "./WhatsAppPageContent";
@@ -6,7 +7,7 @@ import WhatsAppPageContent from "./WhatsAppPageContent";
 export default async function WhatsAppPage() {
   const session = await auth();
   if (!session) redirect("/login");
-  if (session.user.role !== "ADMIN" && session.user.role !== "OWNER") redirect("/dashboard");
+  if (!canAccessStaffFeatures(session.user.role)) redirect("/dashboard");
   const businessId = session.user.businessId!;
   const settings = await getAppSettings(businessId);
   return (

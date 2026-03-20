@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { apiError, apiSuccess } from "@/lib/utils";
+import { apiError, apiSuccess, canAccessStaffFeatures } from "@/lib/utils";
 import { z } from "zod";
 
 const scheduleSchema = z.array(
@@ -34,11 +34,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
   if (!manicurist) return NextResponse.json(apiError("Not found"), { status: 404 });
 
-  if (
-    session.user.role !== "ADMIN" &&
-    session.user.role !== "OWNER" &&
-    session.user.id !== manicurist.userId
-  ) {
+  // Staff (admin/owner/receptionist) puede editar cualquiera; manicurista solo el propio
+  if (!canAccessStaffFeatures(session.user.role) && session.user.id !== manicurist.userId) {
     return NextResponse.json(apiError("Forbidden"), { status: 403 });
   }
 

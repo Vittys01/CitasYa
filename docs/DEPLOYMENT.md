@@ -9,7 +9,7 @@ La app necesita **4 componentes** para funcionar:
 | Redis           | Colas BullMQ (mensajes WA)   |
 | Worker (BullMQ) | Envío de WhatsApp + auto-completar citas |
 
-WhatsApp usa **Meta Cloud API**. Configurá las credenciales por negocio en el panel Owner, o usá `META_WHATSAPP_TOKEN` y `META_PHONE_NUMBER_ID` en el `.env` como fallback.
+WhatsApp soporta **Meta Cloud API** o **Twilio**. Configurá las credenciales por negocio en el panel Owner, o usá variables en `.env` como fallback: `META_WHATSAPP_TOKEN`/`META_PHONE_NUMBER_ID` (Meta) o `TWILIO_ACCOUNT_SID`/`TWILIO_AUTH_TOKEN`/`TWILIO_WHATSAPP_NUMBER` (Twilio).
 
 ---
 
@@ -81,7 +81,7 @@ En el VPS, en el mismo `.env` que usa `docker compose`:
 - `REDIS_URL=redis://redis:6379`
 - `AUTH_SECRET=<generado con openssl rand -base64 32>`
 - `NEXT_PUBLIC_APP_URL=https://tudominio.com`
-- `META_WHATSAPP_TOKEN` y `META_PHONE_NUMBER_ID` (opcional si configurás por negocio en el panel Owner)
+- `META_WHATSAPP_TOKEN` y `META_PHONE_NUMBER_ID` (Meta) o `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_NUMBER` (Twilio) — opcional si configurás por negocio en el panel Owner
 
 No hace falta cambiar el resto del `docker-compose` si ya usas estas variables en `x-app-env`.
 

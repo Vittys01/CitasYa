@@ -102,6 +102,10 @@ REDIS_URL="redis://redis:6379"
 # Configurá por negocio en el panel Owner, o usá estas variables como fallback:
 # META_WHATSAPP_TOKEN="EAAxxxxxxx"
 # META_PHONE_NUMBER_ID="10000000000"
+# ── WhatsApp (Twilio) ──────────────────────────────────────────────────────────
+# TWILIO_ACCOUNT_SID="ACxxxxxxxx"
+# TWILIO_AUTH_TOKEN="xxx"
+# TWILIO_WHATSAPP_NUMBER="whatsapp:+14155238886"
 
 # ── Recordatorios ─────────────────────────────────────────────────────────────
 REMINDER_HOURS_BEFORE="24"

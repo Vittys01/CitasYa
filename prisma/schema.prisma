@@ -53,10 +53,15 @@ model Business {
   owner     User     @relation("BusinessOwner", fields: [ownerId], references: [id], onDelete: Cascade)
 
   // WhatsApp (Meta Cloud API)
-  whatsappProvider       String?  // "meta"
+  whatsappProvider       String?  // "meta" | "twilio"
   whatsappInstanceName    String? // Deprecated (legacy)
   metaPhoneNumberId      String?
   metaAccessToken        String?
+
+  // WhatsApp (Twilio)
+  twilioAccountSid       String?
+  twilioAuthToken        String?
+  twilioWhatsAppNumber   String?  // "whatsapp:+14155238886"
 
   members       User[]       @relation("UserBusiness")
   manicurists   Manicurist[]

@@ -27,10 +27,13 @@ const updateSchema = z.object({
     .optional(),
   isActive: z.boolean().optional(),
   // WhatsApp
-  whatsappProvider: z.enum(["meta", ""]).optional(),
+  whatsappProvider: z.enum(["meta", "twilio", ""]).optional(),
   whatsappInstanceName: z.string().max(100).optional().nullable(),
   metaPhoneNumberId: z.string().max(100).optional().nullable(),
   metaAccessToken: z.string().max(500).optional().nullable(),
+  twilioAccountSid: z.string().max(100).optional().nullable(),
+  twilioAuthToken: z.string().max(500).optional().nullable(),
+  twilioWhatsAppNumber: z.string().max(50).optional().nullable(),
 });
 
 export async function GET(
@@ -100,17 +103,28 @@ export async function PATCH(
     if (conflict) return NextResponse.json(apiError("El slug ya está en uso", "SLUG_TAKEN"), { status: 409 });
   }
 
-  const { whatsappProvider, ...rest } = parsed.data;
+  const {
+    whatsappProvider,
+    metaPhoneNumberId,
+    metaAccessToken,
+    twilioAccountSid,
+    twilioAuthToken,
+    twilioWhatsAppNumber,
+    ...rest
+  } = parsed.data;
+
+  const provider = whatsappProvider === "" ? null : whatsappProvider;
+  const data: Record<string, unknown> = { ...rest };
+  if (whatsappProvider !== undefined) data.whatsappProvider = provider;
+  if (metaPhoneNumberId !== undefined) data.metaPhoneNumberId = metaPhoneNumberId;
+  if (metaAccessToken !== undefined) data.metaAccessToken = metaAccessToken;
+  if (twilioAccountSid !== undefined) data.twilioAccountSid = twilioAccountSid;
+  if (twilioAuthToken !== undefined) data.twilioAuthToken = twilioAuthToken;
+  if (twilioWhatsAppNumber !== undefined) data.twilioWhatsAppNumber = twilioWhatsAppNumber;
 
   const updated = await prisma.business.update({
     where: { id },
-    data: {
-      ...rest,
-      // Empty string means "remove" the provider
-      ...(whatsappProvider !== undefined
-        ? { whatsappProvider: whatsappProvider === "" ? null : whatsappProvider }
-        : {}),
-    },
+    data,
   });
 
   return NextResponse.json(apiSuccess(updated));

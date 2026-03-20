@@ -42,7 +42,7 @@ type NewClientForm = {
 
 const g = (s: Record<string, string> | undefined, k: string, fb: string) => (s && s[k]) ?? fb;
 
-type SelectedService = { serviceId: string; durationMinutes?: number };
+type SelectedService = { serviceId: string; durationMinutes?: number; durationDisplay?: string };
 
 const schema = z.object({
   clientId:     z.string().min(1),
@@ -100,7 +100,10 @@ export default function NewAppointmentButton({
   const [selectedServices, setSelectedServices] = useState<SelectedService[]>([]);
   const totalDuration = selectedServices.reduce((sum, item) => {
     const svc = services.find((s) => s.id === item.serviceId);
-    return sum + (item.durationMinutes ?? svc?.duration ?? 0);
+    const d = item.durationDisplay !== undefined
+    ? parseInt(item.durationDisplay, 10)
+    : item.durationMinutes;
+  return sum + (Number.isNaN(d) || d === undefined ? (svc?.duration ?? 0) : d);
   }, 0);
   const totalPrice = selectedServices.reduce((sum, item) => {
     const svc = services.find((s) => s.id === item.serviceId);
@@ -515,6 +518,9 @@ export default function NewAppointmentButton({
                   {selectedServices.map((item, idx) => {
                     const svc = services.find((s) => s.id === item.serviceId);
                     const dur = item.durationMinutes ?? svc?.duration ?? 0;
+                    const displayValue = item.durationDisplay !== undefined
+                      ? item.durationDisplay
+                      : String(dur);
                     return (
                       <div
                         key={`${item.serviceId}-${idx}`}
@@ -529,13 +535,34 @@ export default function NewAppointmentButton({
                               min={5}
                               max={480}
                               step={5}
-                              value={dur}
+                              value={displayValue}
                               onChange={(e) => {
-                                const v = parseInt(e.target.value, 10);
-                                if (!Number.isNaN(v)) {
+                                const raw = e.target.value;
+                                setSelectedServices((prev) =>
+                                  prev.map((s, i) =>
+                                    i === idx
+                                      ? {
+                                          ...s,
+                                          durationDisplay: raw,
+                                          durationMinutes: raw === "" ? undefined : (parseInt(raw, 10) || undefined),
+                                        }
+                                      : s
+                                  )
+                                );
+                              }}
+                              onBlur={(e) => {
+                                const raw = e.target.value;
+                                const v = parseInt(raw, 10);
+                                if (raw === "" || Number.isNaN(v)) {
                                   setSelectedServices((prev) =>
                                     prev.map((s, i) =>
-                                      i === idx ? { ...s, durationMinutes: v } : s
+                                      i === idx ? { ...s, durationDisplay: undefined, durationMinutes: undefined } : s
+                                    )
+                                  );
+                                } else {
+                                  setSelectedServices((prev) =>
+                                    prev.map((s, i) =>
+                                      i === idx ? { ...s, durationDisplay: undefined, durationMinutes: v } : s
                                     )
                                   );
                                 }
