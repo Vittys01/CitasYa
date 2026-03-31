@@ -4,18 +4,23 @@
  * Responsibilities:
  *   - Validate availability (no double-booking, respect schedules & blocks)
  *   - Create / update / cancel appointments
- *   - Enqueue WhatsApp notifications via BullMQ
+ *   - Programar WhatsApp (confirmación / recordatorio) sin Redis
  */
 
-import { addDays, format } from "date-fns";
+import { addDays, format, isSameDay } from "date-fns";
 import { es } from "date-fns/locale";
 import { prisma } from "@/lib/db";
-import { calcEndTime, intervalsOverlap } from "@/lib/utils";
+import {
+  calcEndTime,
+  ceilToNextSlotMinute,
+  intervalsOverlap,
+  SCHEDULE_SLOT_MINUTES,
+} from "@/lib/utils";
 import {
   enqueueConfirmation,
-  enqueueCancellation,
   scheduleReminder,
-} from "@/lib/queue";
+  cancelScheduledReminder,
+} from "@/lib/notifications-scheduler";
 import { processNotification } from "@/services/notification.service";
 import type {
   CreateAppointmentInput,
@@ -209,12 +214,88 @@ export async function updateAppointment(
 
   const existing = await prisma.appointment.findUniqueOrThrow({ where: { id } });
 
+  // ── Formulario “editar”: reemplazar servicios + horario / cliente / precio ──
+  if (input.services && input.services.length > 0) {
+    const serviceItems = input.services;
+    const servicesData = await prisma.service.findMany({
+      where: { id: { in: serviceItems.map((s) => s.serviceId) } },
+    });
+    const serviceMap = new Map(servicesData.map((s) => [s.id, s]));
+
+    let totalDuration = 0;
+    let totalPrice = 0;
+    const firstServiceId = serviceItems[0].serviceId;
+    for (const item of serviceItems) {
+      const svc = serviceMap.get(item.serviceId);
+      if (!svc) throw new Error(`Servicio ${item.serviceId} no encontrado.`);
+      const dur = item.durationMinutes ?? svc.duration;
+      totalDuration += dur;
+      totalPrice += Number(svc.price);
+    }
+
+    const startAt = input.startAt ? new Date(input.startAt) : existing.startAt;
+    const endAt = calcEndTime(startAt, totalDuration);
+    const manicuristId = input.manicuristId ?? existing.manicuristId;
+    const clientId = input.clientId ?? existing.clientId;
+    const finalPrice = input.price != null && input.price >= 0 ? input.price : totalPrice;
+
+    const available = await isSlotAvailable(manicuristId, startAt, endAt, id);
+    if (!available) throw new Error("El horario seleccionado no está disponible.");
+
+    const other = await getClientOverlappingAppointment(clientId, startAt, endAt, id);
+    if (other) {
+      const range = `${format(other.startAt, "d/M HH:mm", { locale: es })} – ${format(other.endAt, "HH:mm", { locale: es })}`;
+      throw new Error(`El cliente ya tiene un turno en ese horario (${range}). Elegí otro horario o revisá el calendario.`);
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.appointmentService.deleteMany({ where: { appointmentId: id } });
+      for (let i = 0; i < serviceItems.length; i++) {
+        const item = serviceItems[i];
+        const svc = serviceMap.get(item.serviceId)!;
+        await tx.appointmentService.create({
+          data: {
+            appointmentId: id,
+            serviceId: item.serviceId,
+            durationMinutes: item.durationMinutes ?? null,
+            price: svc.price,
+            sortOrder: i,
+          },
+        });
+      }
+      await tx.appointment.update({
+        where: { id },
+        data: {
+          clientId,
+          manicuristId,
+          serviceId: firstServiceId,
+          startAt,
+          endAt,
+          price: finalPrice,
+          ...(input.notes !== undefined && { notes: input.notes }),
+          ...(input.status && { status: input.status }),
+        },
+      });
+    });
+
+    const updated = await prisma.appointment.findUniqueOrThrow({
+      where: { id },
+      include: appointmentInclude,
+    });
+
+    if (updated.status !== "CANCELLED" && updated.status !== "COMPLETED") {
+      cancelScheduledReminder(id);
+      scheduleReminder(id, startAt);
+    }
+
+    return updated as AppointmentWithRelations;
+  }
+
   let startAt = existing.startAt;
   let endAt = existing.endAt;
 
   if (input.startAt || input.serviceId) {
     startAt = input.startAt ? new Date(input.startAt) : existing.startAt;
-    // Al reagendar (solo startAt), preservar duración actual
     const existingDuration = Math.round(
       (existing.endAt.getTime() - existing.startAt.getTime()) / 60000
     );
@@ -231,12 +312,8 @@ export async function updateAppointment(
     const available = await isSlotAvailable(manicuristId, startAt, endAt, id);
     if (!available) throw new Error("El nuevo horario no está disponible.");
 
-    const other = await getClientOverlappingAppointment(
-      existing.clientId,
-      startAt,
-      endAt,
-      id
-    );
+    const overlapClientId = input.clientId ?? existing.clientId;
+    const other = await getClientOverlappingAppointment(overlapClientId, startAt, endAt, id);
     if (other) {
       const range = `${format(other.startAt, "d/M HH:mm", { locale: es })} – ${format(other.endAt, "HH:mm", { locale: es })}`;
       throw new Error(`El cliente ya tiene un turno en ese horario (${range}). Elegí otro horario o revisá el calendario.`);
@@ -250,11 +327,17 @@ export async function updateAppointment(
       ...(input.notes !== undefined && { notes: input.notes }),
       ...(input.manicuristId && { manicuristId: input.manicuristId }),
       ...(input.serviceId && { serviceId: input.serviceId }),
+      ...(input.clientId && { clientId: input.clientId }),
       ...(input.startAt && { startAt, endAt }),
       ...(input.price != null && input.price >= 0 && { price: input.price }),
     },
     include: appointmentInclude,
   });
+
+  if (input.startAt && updated.status !== "CANCELLED" && updated.status !== "COMPLETED") {
+    cancelScheduledReminder(id);
+    scheduleReminder(id, startAt);
+  }
 
   return updated as AppointmentWithRelations;
 }
@@ -272,9 +355,7 @@ export async function cancelAppointment(id: string): Promise<void> {
   });
   if (!appointment) return;
 
-  const { remindersQueue } = await import("@/lib/queue");
-  const pendingReminder = await remindersQueue.getJob(`reminder-${id}`);
-  if (pendingReminder) await pendingReminder.remove();
+  cancelScheduledReminder(id);
 
   await processNotification(id, "CANCELLATION");
   await prisma.appointment.delete({ where: { id } });
@@ -327,7 +408,9 @@ export async function getAppointmentsByWeek(
 export async function getAvailableSlots(
   manicuristId: string,
   date: Date,
-  serviceDuration: number
+  serviceDuration: number,
+  /** Si el día es “hoy”, solo slots desde este instante (p. ej. múltiplo de 5 min ≥ ahora). */
+  earliestStart?: Date
 ): Promise<{ start: Date; end: Date }[]> {
   const dayOfWeek = date.getDay();
   const schedule = await prisma.schedule.findUnique({
@@ -389,6 +472,9 @@ export async function getAvailableSlots(
     cursor = new Date(cursor.getTime() + 15 * 60 * 1000);
   }
 
+  if (earliestStart) {
+    return slots.filter((s) => s.start >= earliestStart);
+  }
   return slots;
 }
 
@@ -400,12 +486,6 @@ export async function getNextAvailableSlots(
   businessId?: string
 ): Promise<{ start: Date; end: Date; manicuristId: string }[]> {
   const now = new Date();
-  const mins = now.getMinutes();
-  const roundedMins = Math.ceil(mins / 15) * 15;
-  const from = new Date(now);
-  from.setMinutes(roundedMins === 60 ? 0 : roundedMins, 0, 0);
-  if (roundedMins === 60) from.setHours(from.getHours() + 1, 0, 0, 0);
-  if (from <= now) from.setTime(from.getTime() + 15 * 60 * 1000);
 
   const ids =
     manicuristIds.length > 0
@@ -420,10 +500,11 @@ export async function getNextAvailableSlots(
 
   for (let d = 0; d < maxDays; d++) {
     const date = addDays(now, d);
+    const earliestStart = isSameDay(date, now) ? ceilToNextSlotMinute(now) : undefined;
     for (const manicuristId of ids) {
-      const daySlots = await getAvailableSlots(manicuristId, date, serviceDuration);
+      const daySlots = await getAvailableSlots(manicuristId, date, serviceDuration, earliestStart);
       for (const slot of daySlots) {
-        if (slot.start >= from) collected.push({ ...slot, manicuristId });
+        collected.push({ ...slot, manicuristId });
       }
     }
   }

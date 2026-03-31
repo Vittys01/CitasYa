@@ -1,16 +1,18 @@
 # ─── Shared environment ───────────────────────────────────────────────────────
 x-app-env: &app-env
   DATABASE_URL:            ${DATABASE_URL:-postgresql://dates_user:dates_pass@postgres:5432/dates_db}
-  REDIS_URL:               ${REDIS_URL:-redis://redis:6379}
   AUTH_SECRET:             ${AUTH_SECRET:-change-me-in-production-min-32-chars}
   NEXT_PUBLIC_APP_URL:     ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
   AUTH_URL:                ${AUTH_URL:-http://localhost:3000}
+  WHATSAPP_PROVIDER:       ${WHATSAPP_PROVIDER:-}
   META_WHATSAPP_TOKEN:     ${META_WHATSAPP_TOKEN:-}
   META_PHONE_NUMBER_ID:    ${META_PHONE_NUMBER_ID:-}
   TWILIO_ACCOUNT_SID:      ${TWILIO_ACCOUNT_SID:-}
   TWILIO_AUTH_TOKEN:       ${TWILIO_AUTH_TOKEN:-}
-  TWILIO_WHATSAPP_NUMBER:  ${TWILIO_WHATSAPP_NUMBER:-}
-  REMINDER_HOURS_BEFORE:   ${REMINDER_HOURS_BEFORE:-24}
+  TWILIO_WHATSAPP_NUMBER:          ${TWILIO_WHATSAPP_NUMBER:-}
+  TWILIO_CONTENT_SID_CONFIRMATION: ${TWILIO_CONTENT_SID_CONFIRMATION:-}
+  TWILIO_CONTENT_SID_REMINDER:     ${TWILIO_CONTENT_SID_REMINDER:-}
+  REMINDER_HOURS_BEFORE:       ${REMINDER_HOURS_BEFORE:-24}
 
 services:
 
@@ -29,20 +31,6 @@ services:
       test: ["CMD-SHELL", "pg_isready -U dates_user -d dates_db"]
       interval: 10s
       timeout: 5s
-      retries: 5
-
-  # ── Redis ────────────────────────────────────────────────────────────────────
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    command: redis-server --appendonly yes
-    volumes:
-      - redis_data:/data
-    # No public ports — only accessible within Docker network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
       retries: 5
 
   # ── Database migrations ──────────────────────────────────────────────────────
@@ -75,15 +63,13 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
-      redis:
-        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000/api/auth/session || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
 
-  # ── BullMQ Worker ─────────────────────────────────────────────────────────────
+  # ── Background worker (auto-completar citas, reconciliar recordatorios) ───────
   worker:
     build:
       context: .
@@ -94,9 +80,6 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
-      redis:
-        condition: service_healthy
 
 volumes:
   postgres_data:
-  redis_data:

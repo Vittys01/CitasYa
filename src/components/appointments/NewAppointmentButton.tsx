@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { format } from "date-fns";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { cn } from "@/lib/utils";
+import { ceilToNextSlotMinute, cn } from "@/lib/utils";
 import { formatPrice } from "@/lib/format-price";
 import type { Manicurist, Client, Schedule } from "@prisma/client";
-import type { ServiceForClient } from "@/lib/serialize";
+import type { ServiceForClient, AppointmentForClient } from "@/lib/serialize";
 import type { EmptySlotPayload } from "./AppointmentsCalendar";
 
 type SlotOption = { start: string; end: string; manicuristId: string; manicuristName: string };
@@ -31,6 +32,8 @@ interface Props {
   initialPrefill?: EmptySlotPayload | null;
   /** When false, no trigger button (parent renders it) */
   renderTrigger?: boolean;
+  /** Modo edición: PATCH en lugar de POST */
+  editingAppointment?: AppointmentForClient | null;
 }
 
 type NewClientForm = {
@@ -67,7 +70,12 @@ export default function NewAppointmentButton({
   onClose: controlledOnClose,
   initialPrefill,
   renderTrigger = true,
+  editingAppointment = null,
 }: Props) {
+  const editingRef = useRef<AppointmentForClient | null>(null);
+  useEffect(() => {
+    editingRef.current = editingAppointment;
+  }, [editingAppointment]);
   const [internalOpen, setInternalOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -134,11 +142,24 @@ export default function NewAppointmentButton({
         if (signal.aborted) return;
         const slots: SlotOption[] = data?.data ?? [];
         setSlotOptions(slots);
+        const edit = editingRef.current;
         if (slots.length > 0) {
-          setValue("startAt",      slots[0].start,        { shouldValidate: false });
-          setValue("manicuristId", slots[0].manicuristId, { shouldValidate: false });
+          if (edit?.id) {
+            const want = new Date(edit.startAt as string).getTime();
+            const match = slots.find((s) => Math.abs(new Date(s.start).getTime() - want) < 120000);
+            if (match) {
+              setValue("startAt", match.start, { shouldValidate: false });
+              setValue("manicuristId", match.manicuristId, { shouldValidate: false });
+            } else {
+              setValue("startAt", new Date(edit.startAt as string).toISOString(), { shouldValidate: false });
+              setValue("manicuristId", edit.manicuristId, { shouldValidate: false });
+            }
+          } else {
+            setValue("startAt", slots[0].start, { shouldValidate: false });
+            setValue("manicuristId", slots[0].manicuristId, { shouldValidate: false });
+          }
         } else {
-          setValue("startAt",      "", { shouldValidate: false });
+          setValue("startAt", "", { shouldValidate: false });
           setValue("manicuristId", "", { shouldValidate: false });
         }
       } catch (e: unknown) {
@@ -171,7 +192,11 @@ export default function NewAppointmentButton({
           const res = await fetch(`/api/appointments/availability?${params}`, { signal });
           const data = await res.json();
           if (signal.aborted) return;
-          const list = (data?.data ?? []) as { start: string; end: string }[];
+          let list = (data?.data ?? []) as { start: string; end: string }[];
+          if (dateStr === format(new Date(), "yyyy-MM-dd")) {
+            const notBefore = ceilToNextSlotMinute(new Date());
+            list = list.filter((s) => new Date(s.start) >= notBefore);
+          }
           const man = manicurists.find((m) => m.id === mid);
           const name = man?.user.name ?? "";
           list.forEach((s) => allSlots.push({ ...s, manicuristId: mid, manicuristName: name }));
@@ -179,11 +204,24 @@ export default function NewAppointmentButton({
         allSlots.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
         if (signal.aborted) return;
         setSlotOptions(allSlots);
+        const edit = editingRef.current;
         if (allSlots.length > 0) {
-          setValue("startAt",      allSlots[0].start,        { shouldValidate: false });
-          setValue("manicuristId", allSlots[0].manicuristId, { shouldValidate: false });
+          if (edit?.id) {
+            const want = new Date(edit.startAt as string).getTime();
+            const match = allSlots.find((s) => Math.abs(new Date(s.start).getTime() - want) < 120000);
+            if (match) {
+              setValue("startAt", match.start, { shouldValidate: false });
+              setValue("manicuristId", match.manicuristId, { shouldValidate: false });
+            } else {
+              setValue("startAt", new Date(edit.startAt as string).toISOString(), { shouldValidate: false });
+              setValue("manicuristId", edit.manicuristId, { shouldValidate: false });
+            }
+          } else {
+            setValue("startAt", allSlots[0].start, { shouldValidate: false });
+            setValue("manicuristId", allSlots[0].manicuristId, { shouldValidate: false });
+          }
         } else {
-          setValue("startAt",      "", { shouldValidate: false });
+          setValue("startAt", "", { shouldValidate: false });
           setValue("manicuristId", "", { shouldValidate: false });
         }
       } catch (e: unknown) {
@@ -272,9 +310,34 @@ export default function NewAppointmentButton({
     }
   }
 
+  // Modo edición: cargar turno existente
+  useEffect(() => {
+    if (!open || !editingAppointment) return;
+    const a = editingAppointment;
+    setSelectedServices(
+      a.services?.length
+        ? a.services.map((s) => ({
+            serviceId: s.serviceId,
+            durationMinutes: s.durationMinutes ?? undefined,
+          }))
+        : [{ serviceId: a.serviceId }]
+    );
+    setPriceOverride(Number(a.price));
+    setValue("clientId", a.clientId, { shouldValidate: true });
+    setValue("manicuristId", a.manicuristId, { shouldValidate: true });
+    setValue("notes", a.notes ?? "", { shouldValidate: false });
+    const d = new Date(a.startAt as string);
+    setPickerDate(format(d, "yyyy-MM-dd"));
+    setManicuristFilter(lockedManicuristId ?? a.manicuristId);
+    const iso = typeof a.startAt === "string" ? a.startAt : new Date(a.startAt).toISOString();
+    setValue("startAt", iso, { shouldValidate: false });
+    setShowNewClient(false);
+    setError(null);
+  }, [open, editingAppointment?.id, setValue, lockedManicuristId]);
+
   // When controlled open becomes true with initialPrefill, apply prefill
   useEffect(() => {
-    if (!open || !initialPrefill) return;
+    if (!open || !initialPrefill || editingAppointment) return;
     setPickerDate(initialPrefill.date);
     setManicuristFilter(initialPrefill.manicuristId ?? lockedManicuristId ?? "");
     setValue("startAt", initialPrefill.startAt, { shouldValidate: false });
@@ -283,7 +346,7 @@ export default function NewAppointmentButton({
 
   // When slotOptions load and we have initialPrefill.startAt, try to select matching slot
   useEffect(() => {
-    if (!initialPrefill?.startAt || slotOptions.length === 0) return;
+    if (editingAppointment || !initialPrefill?.startAt || slotOptions.length === 0) return;
     const match = slotOptions.find((s) => s.start === initialPrefill!.startAt);
     if (match) {
       setValue("startAt", match.start, { shouldValidate: false });
@@ -299,19 +362,26 @@ export default function NewAppointmentButton({
       return;
     }
     try {
+      const servicesPayload = selectedServices.map((s) => ({
+        serviceId: s.serviceId,
+        ...(s.durationMinutes != null && { durationMinutes: s.durationMinutes }),
+      }));
       const body = {
         clientId: data.clientId,
         manicuristId: data.manicuristId,
-        services: selectedServices.map((s) => ({
-          serviceId: s.serviceId,
-          ...(s.durationMinutes && { durationMinutes: s.durationMinutes }),
-        })),
+        services: servicesPayload,
         startAt: new Date(data.startAt).toISOString(),
         notes: data.notes,
         price: finalPrice,
       };
-      const res = await fetch("/api/appointments", {
-        method: "POST",
+
+      const url = editingAppointment?.id
+        ? `/api/appointments/${editingAppointment.id}`
+        : "/api/appointments";
+      const method = editingAppointment?.id ? "PATCH" : "POST";
+
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
@@ -321,18 +391,25 @@ export default function NewAppointmentButton({
           (typeof json.error === "object" && json.error?.message) ||
           (typeof json.error === "string" && json.error) ||
           json.message ||
-          g(settings, "error.createAppointment", "Error al crear el turno");
+          (editingAppointment
+            ? "Error al guardar el turno"
+            : g(settings, "error.createAppointment", "Error al crear el turno"));
         setError(msg);
         return;
       }
       reset();
       if (isControlled) controlledOnClose?.();
       else setInternalOpen(false);
-      // Cerrar primero para que al refrescar el calendario sea visible y se actualice
       await new Promise((r) => setTimeout(r, 0));
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : g(settings, "error.createAppointment", "Error al crear el turno"));
+      setError(
+        err instanceof Error
+          ? err.message
+          : editingAppointment
+            ? "Error al guardar el turno"
+            : g(settings, "error.createAppointment", "Error al crear el turno")
+      );
     }
   }
 
@@ -358,8 +435,16 @@ export default function NewAppointmentButton({
             {/* Header */}
             <div className="flex items-start justify-between px-6 py-5 border-b border-[#e6d5c3] bg-[#FFFDF5] sticky top-0 z-10">
               <div>
-                <h2 className="text-lg font-bold text-earth">{g(settings, "form.title.newAppointment", "Nuevo turno")}</h2>
-                <p className="text-xs text-earth-muted mt-0.5">{g(settings, "form.subtitle.newAppointment", "Completá los datos del turno")}</p>
+                <h2 className="text-lg font-bold text-earth">
+                  {editingAppointment
+                    ? g(settings, "form.title.editAppointment", "Editar turno")
+                    : g(settings, "form.title.newAppointment", "Nuevo turno")}
+                </h2>
+                <p className="text-xs text-earth-muted mt-0.5">
+                  {editingAppointment
+                    ? g(settings, "form.subtitle.editAppointment", "Modificá servicios, horario o cliente")
+                    : g(settings, "form.subtitle.newAppointment", "Completá los datos del turno")}
+                </p>
               </div>
               <button onClick={closeDrawer} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-cream-dark text-[#bda696] hover:text-earth transition">
                 <span className="material-symbols-outlined text-[20px]">close</span>
@@ -779,7 +864,11 @@ export default function NewAppointmentButton({
                 className="flex-1 px-5 py-2.5 text-sm font-bold bg-primary-dark hover:bg-primary-hover text-white rounded-lg shadow-warm-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 <span className="material-symbols-outlined text-[18px]">check</span>
-                {isSubmitting ? g(settings, "common.saving", "Guardando...") : g(settings, "action.saveAppointment", "Guardar turno")}
+                {isSubmitting
+                  ? g(settings, "common.saving", "Guardando...")
+                  : editingAppointment
+                    ? g(settings, "action.saveAppointmentEdit", "Guardar cambios")
+                    : g(settings, "action.saveAppointment", "Guardar turno")}
               </button>
             </div>
           </div>

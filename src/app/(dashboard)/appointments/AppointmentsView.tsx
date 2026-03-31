@@ -35,8 +35,10 @@ export default function AppointmentsView({
 }: AppointmentsViewProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [prefill, setPrefill] = useState<EmptySlotPayload | null>(null);
+  const [editingAppointment, setEditingAppointment] = useState<AppointmentForClient | null>(null);
 
   const handleOpenNew = () => {
+    setEditingAppointment(null);
     setPrefill(null);
     setDrawerOpen(true);
   };
@@ -44,10 +46,18 @@ export default function AppointmentsView({
   const handleCloseDrawer = () => {
     setDrawerOpen(false);
     setPrefill(null);
+    setEditingAppointment(null);
   };
 
   const handleEmptySlotClick = (slot: EmptySlotPayload) => {
+    setEditingAppointment(null);
     setPrefill(slot);
+    setDrawerOpen(true);
+  };
+
+  const handleEditAppointment = (a: AppointmentForClient) => {
+    setEditingAppointment(a);
+    setPrefill(null);
     setDrawerOpen(true);
   };
 
@@ -81,6 +91,7 @@ export default function AppointmentsView({
         settings={settings}
         lockedManicuristId={lockedManicuristId}
         onEmptySlotClick={handleEmptySlotClick}
+        onEditAppointment={handleEditAppointment}
       />
 
       <NewAppointmentButton
@@ -92,6 +103,7 @@ export default function AppointmentsView({
         open={drawerOpen}
         onClose={handleCloseDrawer}
         initialPrefill={prefill}
+        editingAppointment={editingAppointment}
         renderTrigger={false}
       />
     </div>

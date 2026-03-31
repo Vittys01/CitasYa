@@ -181,36 +181,14 @@ export default async function BusinessDetailPage({
           </div>
         </div>
 
-        {/* WhatsApp info */}
-        {business.whatsappProvider && (
-          <div className="mt-4 flex items-center gap-3 p-3 bg-green-50 border border-green-100 rounded-xl">
-            <span className="material-symbols-outlined text-green-600 text-[20px]">smartphone</span>
-            <div>
-              <p className="text-xs font-semibold text-green-700">WhatsApp configurado</p>
-              <p className="text-xs text-green-600">
-                Meta Cloud API{business.metaPhoneNumberId ? ` · ID: ${business.metaPhoneNumberId}` : ""}
-              </p>
-            </div>
-            <Link
-              href={`/owner/businesses/${id}/edit`}
-              className="ml-auto text-xs text-green-700 hover:text-green-900 underline underline-offset-2"
-            >
-              Cambiar
-            </Link>
-          </div>
-        )}
-        {!business.whatsappProvider && (
-          <div className="mt-4 flex items-center gap-3 p-3 bg-amber-50 border border-amber-100 rounded-xl">
-            <span className="material-symbols-outlined text-amber-500 text-[20px]">smartphone</span>
-            <p className="text-xs text-amber-700">WhatsApp no configurado para esta empresa.</p>
-            <Link
-              href={`/owner/businesses/${id}/edit`}
-              className="ml-auto text-xs text-amber-700 hover:text-amber-900 underline underline-offset-2"
-            >
-              Configurar
-            </Link>
-          </div>
-        )}
+        <div className="mt-4 flex items-start gap-3 p-3 bg-[#faf7f4] border border-[#f0e7de] rounded-xl">
+          <span className="material-symbols-outlined text-[#9c8273] text-[20px]">smartphone</span>
+          <p className="text-xs text-[#7a5c44] leading-relaxed">
+            Los mensajes de WhatsApp (confirmaciones y recordatorios) usan una{" "}
+            <strong className="text-[#4a3b32]">única configuración global</strong> en el servidor
+            (variables de entorno), igual para todas las empresas.
+          </p>
+        </div>
       </div>
 
       {/* Members table */}

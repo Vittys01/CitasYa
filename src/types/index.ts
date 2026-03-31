@@ -82,6 +82,10 @@ export interface UpdateAppointmentInput {
   startAt?: string;
   manicuristId?: string;
   serviceId?: string;
+  /** Cambiar cliente del turno */
+  clientId?: string;
+  /** Reemplazar líneas de servicio (misma semántica que al crear) */
+  services?: AppointmentServiceInput[];
   /** Precio total override (solo para esta cita) */
   price?: number;
 }

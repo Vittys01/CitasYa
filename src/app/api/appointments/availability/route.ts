@@ -5,8 +5,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { isSameDay } from "date-fns";
 import { auth } from "@/lib/auth";
-import { apiError, apiSuccess } from "@/lib/utils";
+import { apiError, apiSuccess, ceilToNextSlotMinute } from "@/lib/utils";
 import { getAvailableSlots } from "@/services/appointment.service";
 import { prisma } from "@/lib/db";
 
@@ -42,7 +43,9 @@ export async function GET(req: NextRequest) {
         })()
       : new Date(date);
 
-  const slots = await getAvailableSlots(manicuristId, dateLocal, duration);
+  const now = new Date();
+  const earliestStart = isSameDay(dateLocal, now) ? ceilToNextSlotMinute(now) : undefined;
+  const slots = await getAvailableSlots(manicuristId, dateLocal, duration, earliestStart);
 
   return NextResponse.json(
     apiSuccess(

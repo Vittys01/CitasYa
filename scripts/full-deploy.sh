@@ -100,12 +100,12 @@ else
 fi
 
 # ── 4. Verificar puertos expuestos ────────────────────────────────────────────
-info "Verificando que Redis y Postgres NO estén expuestos..."
-EXPOSED=$(ss -tlnp 2>/dev/null | grep -E ':(6379|5432)\s' || true)
+info "Verificando que Postgres NO esté expuesto al host..."
+EXPOSED=$(ss -tlnp 2>/dev/null | grep -E ':5432\s' || true)
 if [[ -n "$EXPOSED" ]]; then
-  warn "Redis o Postgres podrían estar expuestos. Revisá docker-compose."
+  warn "Postgres podría estar expuesto. Revisá docker-compose."
 else
-  success "Redis y Postgres no expuestos (correcto)"
+  success "Postgres no expuesto (correcto)"
 fi
 
 # ── Resumen final ─────────────────────────────────────────────────────────────

@@ -165,14 +165,6 @@ export default async function OwnerPage() {
                 </div>
               </div>
 
-              {/* WhatsApp badge */}
-              {biz.whatsappProvider && (
-                <div className="flex items-center gap-1.5 text-xs text-green-700 bg-green-50 rounded-lg px-2.5 py-1.5 w-fit">
-                  <span className="material-symbols-outlined text-[14px]">smartphone</span>
-                  WhatsApp: {biz.whatsappProvider === "meta" ? "Meta" : "—"}
-                </div>
-              )}
-
               {/* Actions */}
               <div className="flex items-center gap-1 pt-2 border-t border-[#f0e7de] flex-wrap">
                 <Link

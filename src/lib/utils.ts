@@ -27,6 +27,27 @@ export function formatDate(date: Date): string {
   });
 }
 
+/** Paso de la grilla de turnos (API, lista de horarios, “desde ahora”). */
+export const SCHEDULE_SLOT_MINUTES = 5;
+
+/**
+ * Primer instante en la grilla local de `SCHEDULE_SLOT_MINUTES` que sea >= `now`.
+ */
+export function ceilToNextSlotMinute(now: Date): Date {
+  const step = SCHEDULE_SLOT_MINUTES;
+  const d = new Date(now);
+  d.setSeconds(0, 0);
+  const m = d.getMinutes();
+  const rem = m % step;
+  if (rem !== 0) {
+    d.setMinutes(m + (step - rem), 0, 0);
+  }
+  if (d < now) {
+    d.setMinutes(d.getMinutes() + step, 0, 0);
+  }
+  return d;
+}
+
 /** Calculate end time given a start time and duration (minutes) */
 export function calcEndTime(startAt: Date, durationMinutes: number): Date {
   return addMinutes(startAt, durationMinutes);

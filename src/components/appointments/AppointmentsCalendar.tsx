@@ -12,7 +12,7 @@ import {
   setMinutes,
 } from "date-fns";
 import { es } from "date-fns/locale";
-import { cn } from "@/lib/utils";
+import { cn, SCHEDULE_SLOT_MINUTES } from "@/lib/utils";
 import { formatPrice } from "@/lib/format-price";
 import type { Manicurist, Client, Schedule } from "@prisma/client";
 import type { ServiceForClient, AppointmentForClient } from "@/lib/serialize";
@@ -45,6 +45,8 @@ interface CalendarProps {
   settings?: Record<string, string>;
   lockedManicuristId?: string;
   onEmptySlotClick?: (slot: EmptySlotPayload) => void;
+  /** Abrir formulario de edición con el turno seleccionado */
+  onEditAppointment?: (appointment: AppointmentForClient) => void;
 }
 
 // ─── Status style map ─────────────────────────────────────────────────────────
@@ -144,6 +146,7 @@ export default function AppointmentsCalendar({
   settings,
   lockedManicuristId,
   onEmptySlotClick,
+  onEditAppointment,
 }: CalendarProps) {
   const router = useRouter();
   const statusLabel = (status: string) => (settings && settings[`status.${status}`]) ?? defaultStatusLabel[status] ?? status;
@@ -428,6 +431,19 @@ export default function AppointmentsCalendar({
                   </div>
                 )}
               </div>
+              {selectedAppointment.status !== "CANCELLED" && selectedAppointment.status !== "COMPLETED" && onEditAppointment && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onEditAppointment(selectedAppointment);
+                    setSelectedAppointment(null);
+                  }}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-semibold border border-primary/30 rounded-lg text-primary-dark hover:bg-primary/10 transition"
+                >
+                  <span className="material-symbols-outlined text-[18px]">edit</span>
+                  {(settings && settings["action.editAppointment"]) ?? "Editar turno"}
+                </button>
+              )}
               {/* Cancel appointment — only for pending/confirmed */}
               {selectedAppointment.status !== "CANCELLED" && selectedAppointment.status !== "COMPLETED" && (
                 <div className="pt-4 mt-4 border-t border-[#e6d5c3]">
@@ -824,7 +840,10 @@ type WorkBand = { manicuristId: string; color: string; top: number; height: numb
 
 function slotFromOffsetY(offsetY: number, slotDay: Date): Date {
   const totalMinutes = GRID_START_HOUR * 60 + (offsetY / PX_PER_HOUR) * 60;
-  const rounded = Math.max(0, Math.round(totalMinutes / 15) * 15);
+  const rounded = Math.max(
+    0,
+    Math.round(totalMinutes / SCHEDULE_SLOT_MINUTES) * SCHEDULE_SLOT_MINUTES
+  );
   const h = Math.floor(rounded / 60);
   const m = rounded % 60;
   const start = new Date(slotDay);

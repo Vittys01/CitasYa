@@ -9,13 +9,6 @@ interface BusinessFormProps {
     name: string;
     slug: string;
     isActive: boolean;
-    whatsappProvider?: string | null;
-    whatsappInstanceName?: string | null;
-    metaPhoneNumberId?: string | null;
-    metaAccessToken?: string | null;
-    twilioAccountSid?: string | null;
-    twilioAuthToken?: string | null;
-    twilioWhatsAppNumber?: string | null;
     currency?: string | null;
   };
   businessId?: string;
@@ -29,18 +22,6 @@ export default function BusinessForm({ initialValues, businessId }: BusinessForm
   const [slug, setSlug] = useState(initialValues?.slug ?? "");
   const [isActive, setIsActive] = useState(initialValues?.isActive ?? true);
   const [slugTouched, setSlugTouched] = useState(isEdit);
-
-  // WhatsApp
-  const [wpProvider, setWpProvider] = useState<"" | "meta" | "twilio">(
-    (initialValues?.whatsappProvider === "meta" || initialValues?.whatsappProvider === "twilio")
-      ? initialValues.whatsappProvider
-      : ""
-  );
-  const [metaPhone, setMetaPhone] = useState(initialValues?.metaPhoneNumberId ?? "");
-  const [metaToken, setMetaToken] = useState(initialValues?.metaAccessToken ?? "");
-  const [twilioSid, setTwilioSid] = useState(initialValues?.twilioAccountSid ?? "");
-  const [twilioToken, setTwilioToken] = useState(initialValues?.twilioAuthToken ?? "");
-  const [twilioNumber, setTwilioNumber] = useState(initialValues?.twilioWhatsAppNumber ?? "");
 
   // Currency
   const [currency, setCurrency] = useState(initialValues?.currency ?? "ARS");
@@ -75,13 +56,6 @@ export default function BusinessForm({ initialValues, businessId }: BusinessForm
     const body: Record<string, unknown> = { name, slug };
     if (isEdit) {
       body.isActive = isActive;
-      body.whatsappProvider = wpProvider;
-      body.whatsappInstanceName = null;
-      body.metaPhoneNumberId = wpProvider === "meta" ? metaPhone || null : null;
-      body.metaAccessToken = wpProvider === "meta" ? metaToken || null : null;
-      body.twilioAccountSid = wpProvider === "twilio" ? twilioSid || null : null;
-      body.twilioAuthToken = wpProvider === "twilio" ? twilioToken || null : null;
-      body.twilioWhatsAppNumber = wpProvider === "twilio" ? twilioNumber || null : null;
     }
 
     const res = await fetch(url, {
@@ -211,101 +185,6 @@ export default function BusinessForm({ initialValues, businessId }: BusinessForm
           </>
         )}
       </div>
-
-      {/* ── WhatsApp (solo en edición) ── */}
-      {isEdit && (
-        <div className="space-y-4 pt-2 border-t border-[#f0e7de]">
-          <h3 className="text-sm font-bold text-[#4a3b32] uppercase tracking-wide">
-            WhatsApp
-          </h3>
-
-          <div>
-            <label className="block text-sm font-semibold text-[#4a3b32] mb-1.5">WhatsApp</label>
-            <select
-              value={wpProvider}
-              onChange={(e) => setWpProvider(e.target.value as "" | "meta" | "twilio")}
-              className="w-full px-4 py-2.5 rounded-xl border border-[#e6d5c3] bg-white text-[#4a3b32] focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition text-sm"
-            >
-              <option value="">Sin WhatsApp</option>
-              <option value="meta">Meta Cloud API</option>
-              <option value="twilio">Twilio</option>
-            </select>
-          </div>
-
-          {wpProvider === "meta" && (
-            <>
-              <div>
-                <label className="block text-sm font-semibold text-[#4a3b32] mb-1.5">
-                  Meta Phone Number ID
-                </label>
-                <input
-                  type="text"
-                  value={metaPhone}
-                  onChange={(e) => setMetaPhone(e.target.value)}
-                  placeholder="10000000000"
-                  className="w-full px-4 py-2.5 rounded-xl border border-[#e6d5c3] bg-white text-[#4a3b32] placeholder:text-[#c4a882] focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-[#4a3b32] mb-1.5">
-                  Meta Access Token
-                </label>
-                <input
-                  type="password"
-                  value={metaToken}
-                  onChange={(e) => setMetaToken(e.target.value)}
-                  placeholder="EAAxxxxxxx"
-                  className="w-full px-4 py-2.5 rounded-xl border border-[#e6d5c3] bg-white text-[#4a3b32] placeholder:text-[#c4a882] focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition text-sm"
-                />
-              </div>
-            </>
-          )}
-
-          {wpProvider === "twilio" && (
-            <>
-              <div>
-                <label className="block text-sm font-semibold text-[#4a3b32] mb-1.5">
-                  Twilio Account SID
-                </label>
-                <input
-                  type="text"
-                  value={twilioSid}
-                  onChange={(e) => setTwilioSid(e.target.value)}
-                  placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                  className="w-full px-4 py-2.5 rounded-xl border border-[#e6d5c3] bg-white text-[#4a3b32] placeholder:text-[#c4a882] focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-[#4a3b32] mb-1.5">
-                  Twilio Auth Token
-                </label>
-                <input
-                  type="password"
-                  value={twilioToken}
-                  onChange={(e) => setTwilioToken(e.target.value)}
-                  placeholder="Tu token de Twilio"
-                  className="w-full px-4 py-2.5 rounded-xl border border-[#e6d5c3] bg-white text-[#4a3b32] placeholder:text-[#c4a882] focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-[#4a3b32] mb-1.5">
-                  Número WhatsApp (Twilio)
-                </label>
-                <input
-                  type="text"
-                  value={twilioNumber}
-                  onChange={(e) => setTwilioNumber(e.target.value)}
-                  placeholder="whatsapp:+14155238886"
-                  className="w-full px-4 py-2.5 rounded-xl border border-[#e6d5c3] bg-white text-[#4a3b32] placeholder:text-[#c4a882] focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition text-sm"
-                />
-                <p className="text-xs text-[#9c8273] mt-1">
-                  Formato: whatsapp:+14155238886 (sandbox o número de negocio)
-                </p>
-              </div>
-            </>
-          )}
-        </div>
-      )}
 
       <div className="flex items-center gap-3 pt-2">
         <button

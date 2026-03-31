@@ -14,12 +14,19 @@ import {
 import { prisma } from "@/lib/db";
 import { z } from "zod";
 
+const appointmentServiceSchema = z.object({
+  serviceId: z.string().cuid(),
+  durationMinutes: z.number().int().positive().optional(),
+});
+
 const updateSchema = z.object({
   status: z.enum(["PENDING", "CONFIRMED", "CANCELLED", "COMPLETED"]).optional(),
   notes: z.string().optional(),
   startAt: z.string().datetime().optional(),
   manicuristId: z.string().cuid().optional(),
+  clientId: z.string().cuid().optional(),
   serviceId: z.string().cuid().optional(),
+  services: z.array(appointmentServiceSchema).optional(),
   price: z.number().min(0).optional(),
 });
 

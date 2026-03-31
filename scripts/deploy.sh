@@ -95,9 +95,6 @@ DATABASE_URL="postgresql://dates_user:${DB_PASS}@postgres:5432/dates_db"
 # ── Auth (NextAuth v5) ────────────────────────────────────────────────────────
 AUTH_SECRET="${AUTH_SECRET}"
 
-# ── Redis (BullMQ) ────────────────────────────────────────────────────────────
-REDIS_URL="redis://redis:6379"
-
 # ── WhatsApp (Meta Cloud API) ──────────────────────────────────────────────────
 # Configurá por negocio en el panel Owner, o usá estas variables como fallback:
 # META_WHATSAPP_TOKEN="EAAxxxxxxx"
@@ -149,13 +146,13 @@ until curl -sf "http://localhost:3000/api/auth/session" &>/dev/null; do
 done
 echo ""
 
-# ── 7. Verificar que Redis/Postgres no estén expuestos ────────────────────────
-info "Verificando puertos (Redis/Postgres no deben estar expuestos)..."
-EXPOSED=$(ss -tlnp 2>/dev/null | grep -E ':(6379|5432)\s' || true)
+# ── 7. Verificar que Postgres no esté expuesto ────────────────────────────────
+info "Verificando puertos (Postgres no debe estar expuesto al host)..."
+EXPOSED=$(ss -tlnp 2>/dev/null | grep -E ':5432\s' || true)
 if [[ -n "$EXPOSED" ]]; then
-  warn "Redis (6379) o Postgres (5432) están expuestos. Revisá docker-compose."
+  warn "Postgres (5432) está expuesto. Revisá docker-compose."
 else
-  success "Redis y Postgres no expuestos (correcto)"
+  success "Postgres no expuesto (correcto)"
 fi
 
 # ── 8. Estado final ───────────────────────────────────────────────────────────

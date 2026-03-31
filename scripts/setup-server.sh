@@ -123,14 +123,14 @@ fi
 usermod -aG docker "$NEW_USER"
 systemctl enable docker
 
-# ── 8. Verificar que Redis/Postgres no estén expuestos ────────────────────────
+# ── 8. Verificar que Postgres no esté expuesto ────────────────────────────────
 echo "[8/8] Verificando puertos expuestos..."
-EXPOSED=$(ss -tlnp 2>/dev/null | grep -E ':(6379|5432)\s' || true)
+EXPOSED=$(ss -tlnp 2>/dev/null | grep -E ':5432\s' || true)
 if [[ -n "$EXPOSED" ]]; then
-  echo "   ADVERTENCIA: Redis (6379) o Postgres (5432) podrían estar expuestos."
-  echo "   Asegurate de que docker-compose NO mapee esos puertos al host."
+  echo "   ADVERTENCIA: Postgres (5432) podría estar expuesto."
+  echo "   Asegurate de que docker-compose NO mapee ese puerto al host."
 else
-  echo "   OK: Redis y Postgres no expuestos en el host."
+  echo "   OK: Postgres no expuesto en el host."
 fi
 
 # ── 9. Resumen ────────────────────────────────────────────────────────────────

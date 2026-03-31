@@ -9,7 +9,7 @@
  */
 
 import { prisma } from "@/lib/db";
-import { scheduleReminder } from "@/lib/queue";
+import { scheduleReminder } from "@/lib/notifications-scheduler";
 
 export async function reconcileReminders(): Promise<void> {
   const hoursBeforeMs =

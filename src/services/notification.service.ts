@@ -2,16 +2,19 @@
  * Notification Service — handles sending WhatsApp messages
  * and logging results to the Notification table.
  *
- * Called exclusively by BullMQ workers (never from HTTP handlers directly).
+ * Llamado desde el scheduler en memoria o desde el worker de fondo.
  */
 
 import { prisma } from "@/lib/db";
 import { getAppSettings } from "@/services/settings.service";
 import {
-  getProviderForBusiness,
+  getWhatsAppProvider,
   buildConfirmationMessage,
   buildReminderMessage,
   buildCancellationMessage,
+  buildReminderTwilioContentVariables,
+  buildConfirmationTwilioContentVariables,
+  type WhatsAppSendResult,
 } from "@/lib/whatsapp";
 import type { NotificationType } from "@prisma/client";
 
@@ -57,21 +60,8 @@ export async function processNotification(
   const { client, service, manicurist, businessId } = appointment;
   const manicuristName = manicurist.user.name;
 
-  const [settings, business] = await Promise.all([
-    getAppSettings(businessId),
-    prisma.business.findUnique({
-      where: { id: businessId },
-      select: {
-        whatsappProvider: true,
-        metaPhoneNumberId: true,
-        metaAccessToken: true,
-        twilioAccountSid: true,
-        twilioAuthToken: true,
-        twilioWhatsAppNumber: true,
-      },
-    }),
-  ]);
-  const provider = getProviderForBusiness(business);
+  const settings = await getAppSettings(businessId);
+  const provider = getWhatsAppProvider();
   const templateConfirmation = settings["whatsapp.template.confirmation"];
   const templateReminder = settings["whatsapp.template.reminder"];
   const templateCancellation = settings["whatsapp.template.cancellation"];
@@ -115,7 +105,44 @@ export async function processNotification(
       throw new Error(`Unknown notification type: ${type}`);
   }
 
-  const result = await provider.sendText({ to: client.phone, body });
+  const confirmationContentSid = process.env.TWILIO_CONTENT_SID_CONFIRMATION?.trim();
+  const reminderContentSid = process.env.TWILIO_CONTENT_SID_REMINDER?.trim();
+  const twilioSendTemplate = provider.sendContentTemplate;
+
+  let result: WhatsAppSendResult;
+  if (
+    type === "CONFIRMATION" &&
+    confirmationContentSid &&
+    typeof twilioSendTemplate === "function"
+  ) {
+    result = await twilioSendTemplate({
+      to: client.phone,
+      contentSid: confirmationContentSid,
+      variables: buildConfirmationTwilioContentVariables({
+        clientName: client.name,
+        serviceName: service.name,
+        manicuristName,
+        startAt: appointment.startAt,
+      }),
+    });
+  } else if (
+    type === "REMINDER_24H" &&
+    reminderContentSid &&
+    typeof twilioSendTemplate === "function"
+  ) {
+    result = await twilioSendTemplate({
+      to: client.phone,
+      contentSid: reminderContentSid,
+      variables: buildReminderTwilioContentVariables({
+        clientName: client.name,
+        serviceName: service.name,
+        manicuristName,
+        startAt: appointment.startAt,
+      }),
+    });
+  } else {
+    result = await provider.sendText({ to: client.phone, body });
+  }
 
   await prisma.notification.update({
     where: { id: notification.id },
@@ -128,8 +155,10 @@ export async function processNotification(
   });
 
   if (!result.success) {
-    // Re-throw so BullMQ retries the job
-    throw new Error(`WhatsApp send failed: ${result.error}`);
+    console.error(
+      `[Notification] ❌ ${type} falló para cita ${appointmentId} (${client.phone}): ${result.error}`
+    );
+    return;
   }
 
   console.info(
