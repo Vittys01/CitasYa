@@ -1,5 +1,7 @@
 # Dependencies
 node_modules/
+# Heroku / un solo lockfile: usamos package-lock.json (npm)
+pnpm-lock.yaml
 .pnp
 .pnp.js
 
