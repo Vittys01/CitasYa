@@ -270,14 +270,6 @@ async function main() {
   for (const { key, value } of defaultSettings) {
     await prisma.appSetting.create({ data: { businessId, key, value } });
   }
-
-  console.log("✅ Seed completo");
-  console.log("─────────────────────────────────────");
-  console.log("  OWNER:  bvittys@gmail.com    / 123vittyS");
-  console.log("  ADMIN:  paolaLopez@gmail.com / Montecatini123");
-  console.log("  MANI:   paola@gmail.com       / 123mani");
-  console.log("  Empresa: Montecatini (slug: montecatini)");
-  console.log("─────────────────────────────────────");
 }
 
 main()
