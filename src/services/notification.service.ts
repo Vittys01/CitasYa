@@ -102,15 +102,15 @@ export async function processNotification(
 
   const confirmationContentSid = process.env.TWILIO_CONTENT_SID_CONFIRMATION?.trim();
   const reminderContentSid = process.env.TWILIO_CONTENT_SID_REMINDER?.trim();
-  const twilioSendTemplate = provider.sendContentTemplate;
 
   let result: WhatsAppSendResult;
+  // No extraer sendContentTemplate a variable: al llamarla suelta pierde `this` y falla this.accountSid en Twilio.
   if (
     type === "CONFIRMATION" &&
     confirmationContentSid &&
-    typeof twilioSendTemplate === "function"
+    typeof provider.sendContentTemplate === "function"
   ) {
-    result = await twilioSendTemplate({
+    result = await provider.sendContentTemplate({
       to: client.phone,
       contentSid: confirmationContentSid,
       variables: buildConfirmationTwilioContentVariables({
@@ -123,9 +123,9 @@ export async function processNotification(
   } else if (
     type === "REMINDER_24H" &&
     reminderContentSid &&
-    typeof twilioSendTemplate === "function"
+    typeof provider.sendContentTemplate === "function"
   ) {
-    result = await twilioSendTemplate({
+    result = await provider.sendContentTemplate({
       to: client.phone,
       contentSid: reminderContentSid,
       variables: buildReminderTwilioContentVariables({
