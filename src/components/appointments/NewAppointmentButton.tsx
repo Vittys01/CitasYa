@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 import { ceilToNextSlotMinute, cn } from "@/lib/utils";
 import { formatPrice } from "@/lib/format-price";
 import type { Manicurist, Client, Schedule } from "@prisma/client";
-import type { ServiceForClient, AppointmentForClient } from "@/lib/serialize";
+import { appointmentFromApiJson, type ServiceForClient, type AppointmentForClient } from "@/lib/serialize";
 import type { EmptySlotPayload } from "./AppointmentsCalendar";
 
 type SlotOption = { start: string; end: string; manicuristId: string; manicuristName: string };
@@ -34,6 +34,8 @@ interface Props {
   renderTrigger?: boolean;
   /** Modo edición: PATCH en lugar de POST */
   editingAppointment?: AppointmentForClient | null;
+  /** Tras crear/editar OK: actualiza el calendario al instante (además de router.refresh) */
+  onAppointmentSaved?: (appointment: AppointmentForClient) => void;
 }
 
 type NewClientForm = {
@@ -71,6 +73,7 @@ export default function NewAppointmentButton({
   initialPrefill,
   renderTrigger = true,
   editingAppointment = null,
+  onAppointmentSaved,
 }: Props) {
   const editingRef = useRef<AppointmentForClient | null>(null);
   useEffect(() => {
@@ -397,6 +400,9 @@ export default function NewAppointmentButton({
         setError(msg);
         return;
       }
+      const raw = (json as { data?: unknown }).data;
+      const merged = raw ? appointmentFromApiJson(raw) : null;
+      if (merged && onAppointmentSaved) onAppointmentSaved(merged);
       reset();
       if (isControlled) controlledOnClose?.();
       else setInternalOpen(false);

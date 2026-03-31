@@ -6,6 +6,9 @@ import { serializeServices, serializeAppointmentPrice } from "@/lib/serialize";
 import AppointmentsView from "./AppointmentsView";
 import { startOfWeek } from "date-fns";
 
+/** Evita caché RSC: tras crear un turno, `router.refresh()` debe traer datos nuevos. */
+export const dynamic = "force-dynamic";
+
 export default async function AppointmentsPage() {
   const session = await auth();
   const businessId = session?.user.businessId!;

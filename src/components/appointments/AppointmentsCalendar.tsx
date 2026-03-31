@@ -47,6 +47,8 @@ interface CalendarProps {
   onEmptySlotClick?: (slot: EmptySlotPayload) => void;
   /** Abrir formulario de edición con el turno seleccionado */
   onEditAppointment?: (appointment: AppointmentForClient) => void;
+  /** Expone merge de citas tras POST/PATCH para no depender solo de router.refresh() */
+  onMergeHandlerReady?: (merge: (a: AppointmentForClient) => void) => void;
 }
 
 // ─── Status style map ─────────────────────────────────────────────────────────
@@ -147,6 +149,7 @@ export default function AppointmentsCalendar({
   lockedManicuristId,
   onEmptySlotClick,
   onEditAppointment,
+  onMergeHandlerReady,
 }: CalendarProps) {
   const router = useRouter();
   const statusLabel = (status: string) => (settings && settings[`status.${status}`]) ?? defaultStatusLabel[status] ?? status;
@@ -179,6 +182,31 @@ export default function AppointmentsCalendar({
   useEffect(() => {
     setAppointments(initialAppointments);
   }, [initialAppointments]);
+
+  const mergeAppointmentIntoState = useCallback(
+    (appt: AppointmentForClient) => {
+      const apptWeek = format(startOfWeek(new Date(appt.startAt), { weekStartsOn: 1 }), "yyyy-MM-dd");
+      const mergeList = (list: AppointmentForClient[]) => {
+        const exists = list.some((x) => x.id === appt.id);
+        if (exists) return list.map((x) => (x.id === appt.id ? appt : x));
+        return [...list, appt].sort(
+          (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime()
+        );
+      };
+      if (apptWeek === initialWeekStartKey) {
+        setAppointments((prev) => mergeList(prev));
+      }
+      setFetchedByWeek((prev) => {
+        const list = prev[apptWeek];
+        return { ...prev, [apptWeek]: mergeList(list ?? []) };
+      });
+    },
+    [initialWeekStartKey]
+  );
+
+  useEffect(() => {
+    onMergeHandlerReady?.(mergeAppointmentIntoState);
+  }, [onMergeHandlerReady, mergeAppointmentIntoState]);
 
   // Semana que estamos mostrando (en vista día es la semana del día seleccionado)
   const viewWeekStart = view === "week" ? weekStart : startOfWeek(selectedDay, { weekStartsOn: 1 });

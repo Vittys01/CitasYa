@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import AppointmentsCalendar, { type EmptySlotPayload } from "@/components/appointments/AppointmentsCalendar";
 import NewAppointmentButton from "@/components/appointments/NewAppointmentButton";
 import type { Manicurist, Client, Schedule } from "@prisma/client";
 import type { ServiceForClient, AppointmentForClient } from "@/lib/serialize";
+
+type MergeFn = (a: AppointmentForClient) => void;
 
 type ManicuristWithDetails = Manicurist & {
   user: { id: string; name: string };
@@ -36,6 +38,7 @@ export default function AppointmentsView({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [prefill, setPrefill] = useState<EmptySlotPayload | null>(null);
   const [editingAppointment, setEditingAppointment] = useState<AppointmentForClient | null>(null);
+  const mergeAppointmentRef = useRef<MergeFn | null>(null);
 
   const handleOpenNew = () => {
     setEditingAppointment(null);
@@ -92,6 +95,9 @@ export default function AppointmentsView({
         lockedManicuristId={lockedManicuristId}
         onEmptySlotClick={handleEmptySlotClick}
         onEditAppointment={handleEditAppointment}
+        onMergeHandlerReady={(fn) => {
+          mergeAppointmentRef.current = fn;
+        }}
       />
 
       <NewAppointmentButton
@@ -105,6 +111,7 @@ export default function AppointmentsView({
         initialPrefill={prefill}
         editingAppointment={editingAppointment}
         renderTrigger={false}
+        onAppointmentSaved={(appt) => mergeAppointmentRef.current?.(appt)}
       />
     </div>
   );

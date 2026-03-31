@@ -33,3 +33,23 @@ export function serializeAppointmentPrice(a: AppointmentWithRelations): Appointm
   }
   return result as AppointmentForClient;
 }
+
+/** Normaliza el JSON de POST/PATCH `/api/appointments` para el calendario (Decimal → number). */
+export function appointmentFromApiJson(raw: unknown): AppointmentForClient | null {
+  if (!raw || typeof raw !== "object") return null;
+  const a = raw as Record<string, unknown>;
+  const services = a.services;
+  const normalized: Record<string, unknown> = {
+    ...a,
+    price: Number(a.price ?? 0),
+    startAt: a.startAt as string,
+    endAt: a.endAt as string,
+  };
+  if (Array.isArray(services)) {
+    normalized.services = services.map((item) => {
+      const s = item as Record<string, unknown>;
+      return { ...s, price: Number(s.price ?? 0) };
+    });
+  }
+  return normalized as AppointmentForClient;
+}
