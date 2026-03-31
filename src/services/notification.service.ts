@@ -6,7 +6,6 @@
  */
 
 import { prisma } from "@/lib/db";
-import { getAppSettings } from "@/services/settings.service";
 import {
   getWhatsAppProvider,
   buildConfirmationMessage,
@@ -57,15 +56,11 @@ export async function processNotification(
     });
   }
 
-  const { client, service, manicurist, businessId } = appointment;
+  const { client, service, manicurist } = appointment;
   const manicuristName = manicurist.user.name;
 
-  const settings = await getAppSettings(businessId);
   const provider = getWhatsAppProvider();
-  const templateConfirmation = settings["whatsapp.template.confirmation"];
-  const templateReminder = settings["whatsapp.template.reminder"];
-  const templateCancellation = settings["whatsapp.template.cancellation"];
-
+  /** Texto libre solo si no usás plantillas Twilio Content (TWILIO_CONTENT_SID_* en .env). */
   let body: string;
 
   switch (type) {
@@ -77,7 +72,7 @@ export async function processNotification(
           manicuristName,
           startAt: appointment.startAt,
         },
-        templateConfirmation
+        undefined
       );
       break;
     case "REMINDER_24H":
@@ -88,7 +83,7 @@ export async function processNotification(
           manicuristName,
           startAt: appointment.startAt,
         },
-        templateReminder
+        undefined
       );
       break;
     case "CANCELLATION":
@@ -98,7 +93,7 @@ export async function processNotification(
           serviceName: service.name,
           startAt: appointment.startAt,
         },
-        templateCancellation
+        undefined
       );
       break;
     default:

@@ -1,8 +1,6 @@
 import { redirect } from "next/navigation";
 
-/**
- * Con Meta Cloud API no se usa QR. Redirigir a la página de WhatsApp.
- */
+/** Ruta antigua: las plantillas WhatsApp se configuran en Twilio y en variables de entorno. */
 export default function WhatsAppQrPage() {
-  redirect("/whatsapp");
+  redirect("/settings");
 }

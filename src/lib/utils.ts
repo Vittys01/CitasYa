@@ -103,7 +103,7 @@ export function apiError(message: string, code?: string, status = 400) {
   return { success: false, error: { message, code }, status };
 }
 
-/** Roles que pueden acceder a gestión (servicios, equipo, clientes, WhatsApp, settings). Manicuristas excluidos. */
+/** Roles que pueden acceder a gestión (servicios, equipo, clientes, settings). Manicuristas excluidos. */
 export function canAccessStaffFeatures(role: string): boolean {
   return ["ADMIN", "OWNER", "RECEPTIONIST"].includes(role);
 }
