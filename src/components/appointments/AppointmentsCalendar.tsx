@@ -19,12 +19,12 @@ import type { ServiceForClient, AppointmentForClient } from "@/lib/serialize";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-/** Day start hour shown in the grid */
-const GRID_START_HOUR = 8;
-/** Number of hours visible */
-const GRID_HOURS      = 12; // 8 AM → 8 PM
-/** Pixel height per hour */
-const PX_PER_HOUR     = 96;
+/** Inicio del día en la grilla (0 = medianoche) */
+const GRID_START_HOUR = 0;
+/** Horas visibles: día completo 00:00–23:59 */
+const GRID_HOURS      = 24;
+/** Altura por hora (24 h → altura total moderada con scroll) */
+const PX_PER_HOUR     = 52;
 /** Min width per day column (week view) so overlapping appointments don’t get squished */
 const MIN_DAY_WIDTH_PX = 160;
 
@@ -68,6 +68,14 @@ const defaultStatusLabel: Record<string, string> = {
 };
 
 // ─── Helper: pixel offset from top of grid ────────────────────────────────────
+
+/** Etiqueta 12h para la columna de horas (0 = 12 AM, 12 = 12 PM). */
+function formatHourLabel(h: number): string {
+  if (h === 0) return "12 AM";
+  if (h < 12) return `${h} AM`;
+  if (h === 12) return "12 PM";
+  return `${h - 12} PM`;
+}
 
 function topPx(date: Date): number {
   const minutes = (date.getHours() - GRID_START_HOUR) * 60 + date.getMinutes();
@@ -742,7 +750,7 @@ export default function AppointmentsCalendar({
               {hours.map((h) => (
                 <div key={h} style={{ height: PX_PER_HOUR }} className="relative">
                   <span className="absolute -top-2.5 right-2 text-[10px] font-medium text-[#bda696] bg-[#FFFDF5] px-1 select-none">
-                    {h === 12 ? "12 PM" : h < 12 ? `${h} AM` : `${h - 12} PM`}
+                    {formatHourLabel(h)}
                   </span>
                 </div>
               ))}

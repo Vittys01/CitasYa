@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { resolveBusinessIdFromSession } from "@/lib/resolve-business-session";
 import { apiError, apiSuccess } from "@/lib/utils";
 import { createClient, searchClients } from "@/services/client.service";
 import { z } from "zod";
@@ -24,7 +25,7 @@ const createSchema = z.object({
 export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json(apiError("Unauthorized"), { status: 401 });
-  const businessId = session.user.businessId;
+  const businessId = await resolveBusinessIdFromSession(session);
   if (!businessId) return NextResponse.json(apiError("No business context"), { status: 403 });
 
   const { searchParams } = req.nextUrl;
@@ -39,7 +40,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json(apiError("Unauthorized"), { status: 401 });
-  const businessId = session.user.businessId;
+  const businessId = await resolveBusinessIdFromSession(session);
   if (!businessId) return NextResponse.json(apiError("No business context"), { status: 403 });
 
   const body = await req.json();

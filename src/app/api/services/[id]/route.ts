@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { resolveBusinessIdFromSession } from "@/lib/resolve-business-session";
 import { apiError, apiSuccess, canAccessStaffFeatures } from "@/lib/utils";
 import { z } from "zod";
 
@@ -44,7 +45,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   if (!canAccessStaffFeatures(session.user.role)) {
     return NextResponse.json(apiError("Forbidden"), { status: 403 });
   }
-  const businessId = session.user.businessId;
+  const businessId = await resolveBusinessIdFromSession(session);
   if (!businessId) return NextResponse.json(apiError("No business context"), { status: 403 });
 
   const { id } = await params;

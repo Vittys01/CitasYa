@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { resolveBusinessIdFromSession } from "@/lib/resolve-business-session";
 import { apiError, apiSuccess } from "@/lib/utils";
 import {
   createAppointment,
@@ -26,6 +27,7 @@ const createSchema = z.object({
   startAt: z.string().datetime(),
   notes: z.string().optional(),
   price: z.number().min(0).optional(),
+  sendWhatsApp: z.boolean().optional(),
 }).refine(
   (d) => d.serviceId || (d.services && d.services.length > 0),
   { message: "Indicá serviceId o services" }
@@ -34,7 +36,7 @@ const createSchema = z.object({
 export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json(apiError("Unauthorized", "AUTH"), { status: 401 });
-  const businessId = session.user.businessId;
+  const businessId = await resolveBusinessIdFromSession(session);
   if (!businessId) return NextResponse.json(apiError("No business context"), { status: 403 });
 
   const { searchParams } = req.nextUrl;

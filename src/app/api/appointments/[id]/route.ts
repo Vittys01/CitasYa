@@ -28,6 +28,7 @@ const updateSchema = z.object({
   serviceId: z.string().cuid().optional(),
   services: z.array(appointmentServiceSchema).optional(),
   price: z.number().min(0).optional(),
+  sendWhatsApp: z.boolean().optional(),
 });
 
 type Params = { params: Promise<{ id: string }> };

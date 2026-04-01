@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { resolveBusinessIdFromSession } from "@/lib/resolve-business-session";
 import { apiError, apiSuccess } from "@/lib/utils";
 import { getNextAvailableSlots } from "@/services/appointment.service";
 import { prisma } from "@/lib/db";
@@ -14,7 +15,7 @@ export async function GET(req: NextRequest) {
   try {
     const session = await auth();
     if (!session) return NextResponse.json(apiError("Unauthorized"), { status: 401 });
-    const businessId = session.user.businessId;
+    const businessId = await resolveBusinessIdFromSession(session);
     if (!businessId) return NextResponse.json(apiError("No business context"), { status: 403 });
 
     const { searchParams } = req.nextUrl;

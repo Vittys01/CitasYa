@@ -81,6 +81,8 @@ export default function NewAppointmentButton({
   }, [editingAppointment]);
   const [internalOpen, setInternalOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Confirmación + recordatorio por WhatsApp (por defecto activo). */
+  const [sendWhatsApp, setSendWhatsApp] = useState(true);
   const router = useRouter();
 
   // ── Local client list (starts from prop, grows with inline creates) ──────────
@@ -274,6 +276,7 @@ export default function NewAppointmentButton({
     setShowNewClient(false);
     setNewClient({ name: "", phone: "", email: "", notes: "" });
     setNewClientError("");
+    setSendWhatsApp(true);
     if (!isControlled) setInternalOpen(true);
   }
 
@@ -376,6 +379,7 @@ export default function NewAppointmentButton({
         startAt: new Date(data.startAt).toISOString(),
         notes: data.notes,
         price: finalPrice,
+        sendWhatsApp,
       };
 
       const url = editingAppointment?.id
@@ -835,16 +839,38 @@ export default function NewAppointmentButton({
                 />
               </div>
 
-              {/* WhatsApp toggle */}
+              {/* WhatsApp: confirmación al crear y recordatorio (editable) */}
               <div className="border-t border-[#f0ede8] pt-5">
-                <div className="flex items-center justify-between">
-                  <div>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
                     <p className="text-sm font-semibold text-earth">{g(settings, "form.whatsapp.label", "Enviar confirmación por WhatsApp")}</p>
-                    <p className="text-xs text-earth-muted mt-0.5">{g(settings, "form.whatsapp.sub", "Mensaje automático con fecha y hora")}</p>
+                    <p className="text-xs text-earth-muted mt-0.5">
+                      {g(
+                        settings,
+                        "form.whatsapp.sub",
+                        editingAppointment
+                          ? "Si lo desactivás, no se reprograma el recordatorio al guardar."
+                          : "Mensaje automático con fecha y hora; también programa el recordatorio."
+                      )}
+                    </p>
                   </div>
-                  <div className="w-11 h-6 bg-primary-dark rounded-full relative cursor-pointer">
-                    <div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full shadow-sm" />
-                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={sendWhatsApp}
+                    onClick={() => setSendWhatsApp((v) => !v)}
+                    className={cn(
+                      "shrink-0 w-11 h-6 rounded-full relative transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-2",
+                      sendWhatsApp ? "bg-primary-dark" : "bg-[#D7CCC8]"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-[left]",
+                        sendWhatsApp ? "right-1" : "left-1"
+                      )}
+                    />
+                  </button>
                 </div>
               </div>
             </div>

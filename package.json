@@ -6,7 +6,7 @@
     "node": "20.x"
   },
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -H 0.0.0.0 -p 3000",
     "build": "prisma generate && next build",
     "postbuild": "node scripts/copy-standalone-assets.js",
     "start": "node .next/standalone/server.js",
@@ -43,16 +43,17 @@
     "lucide-react": "^0.462.0",
     "next": "15.0.4",
     "next-auth": "^5.0.0-beta.25",
+    "prisma": "^5.22.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.53.2",
     "recharts": "^2.13.3",
+    "server-only": "^0.0.1",
     "socket.io-client": "^4.8.3",
     "tailwind-merge": "^2.5.4",
     "tailwindcss-animate": "^1.0.7",
-    "zod": "^3.23.8",
-    "prisma": "^5.22.0",
-    "tsx": "^4.19.2"
+    "tsx": "^4.19.2",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

@@ -74,6 +74,8 @@ export interface CreateAppointmentInput {
   notes?: string;
   /** Precio total override (solo para esta cita, ej: diseño extra, adicionales) */
   price?: number;
+  /** Si es false, no se envía confirmación por WhatsApp ni se programa recordatorio. Por defecto true. */
+  sendWhatsApp?: boolean;
 }
 
 export interface UpdateAppointmentInput {
@@ -88,6 +90,8 @@ export interface UpdateAppointmentInput {
   services?: AppointmentServiceInput[];
   /** Precio total override (solo para esta cita) */
   price?: number;
+  /** Si es false, al guardar se cancela el recordatorio y no se reprograma (ni confirmación en creación). Por defecto true. */
+  sendWhatsApp?: boolean;
 }
 
 export interface CreateClientInput {

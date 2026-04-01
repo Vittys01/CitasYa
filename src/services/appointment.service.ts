@@ -195,8 +195,10 @@ export async function createAppointment(
     include: appointmentInclude,
   });
 
-  void enqueueConfirmation(appointment.id);
-  void scheduleReminder(appointment.id, startAt);
+  if (input.sendWhatsApp !== false) {
+    void enqueueConfirmation(appointment.id);
+    void scheduleReminder(appointment.id, startAt);
+  }
 
   return appointment as AppointmentWithRelations;
 }
@@ -285,7 +287,9 @@ export async function updateAppointment(
 
     if (updated.status !== "CANCELLED" && updated.status !== "COMPLETED") {
       cancelScheduledReminder(id);
-      scheduleReminder(id, startAt);
+      if (input.sendWhatsApp !== false) {
+        scheduleReminder(id, startAt);
+      }
     }
 
     return updated as AppointmentWithRelations;
@@ -336,7 +340,9 @@ export async function updateAppointment(
 
   if (input.startAt && updated.status !== "CANCELLED" && updated.status !== "COMPLETED") {
     cancelScheduledReminder(id);
-    scheduleReminder(id, startAt);
+    if (input.sendWhatsApp !== false) {
+      scheduleReminder(id, startAt);
+    }
   }
 
   return updated as AppointmentWithRelations;
