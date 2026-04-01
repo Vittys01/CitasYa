@@ -14,21 +14,31 @@ export interface WhatsAppContentMessage {
   variables: Record<string, string>;
 }
 
+/** Meta Cloud API: plantilla aprobada en WhatsApp Manager (mismas variables {{1}}… que en Twilio). */
+export interface WhatsAppMetaTemplateMessage {
+  to: string;
+  templateName: string;
+  /** Código de idioma de la plantilla, p. ej. `es_AR` o `es`. */
+  languageCode: string;
+  variables: Record<string, string>;
+}
+
 export interface WhatsAppSendResult {
   success: boolean;
   externalId?: string;
   error?: string;
 }
 
-interface WhatsAppProvider {
+export interface WhatsAppProvider {
   sendText(msg: WhatsAppMessage): Promise<WhatsAppSendResult>;
   sendContentTemplate?(msg: WhatsAppContentMessage): Promise<WhatsAppSendResult>;
+  sendMetaTemplate?(msg: WhatsAppMetaTemplateMessage): Promise<WhatsAppSendResult>;
 }
 
 /**
  * Lee Twilio desde .env. Incluye typo frecuente TWILIO_ACCOUUNT_SID → mismo valor que ACCOUNT.
  */
-function twilioCredentialsFromEnv(): { sid: string; token: string; from: string } | null {
+export function twilioCredentialsFromEnv(): { sid: string; token: string; from: string } | null {
   const sid =
     process.env.TWILIO_ACCOUNT_SID?.trim() ||
     process.env.TWILIO_ACCOUUNT_SID?.trim() ||
@@ -142,12 +152,96 @@ class MetaProvider implements WhatsAppProvider {
       return { success: false, error: String(err) };
     }
   }
+
+  async sendMetaTemplate(msg: WhatsAppMetaTemplateMessage): Promise<WhatsAppSendResult> {
+    try {
+      const token = this.token.trim();
+      const phoneNumberId = this.phoneNumberId.trim();
+      if (!token || !phoneNumberId) {
+        return {
+          success: false,
+          error:
+            "Meta WhatsApp sin configurar: definí META_PHONE_NUMBER_ID y META_WHATSAPP_TOKEN en .env (o WHATSAPP_PROVIDER=meta con esas variables).",
+        };
+      }
+
+      if (!isLikelyMetaPhoneNumberId(phoneNumberId)) {
+        return {
+          success: false,
+          error: `Meta Phone Number ID inválido ("${phoneNumberId.slice(0, 24)}…"): debe ser solo dígitos (ID del número en WhatsApp → API Setup). No uses el WhatsApp Business Account ID ni el ID de la aplicación.`,
+        };
+      }
+
+      const recipient = toMetaWhatsAppRecipient(msg.to);
+      if (!recipient || recipient.length < 8) {
+        return {
+          success: false,
+          error: `Teléfono del cliente inválido para WhatsApp: "${msg.to}" (se espera E.164, p. ej. +54911…).`,
+        };
+      }
+
+      const templateName = msg.templateName?.trim();
+      if (!templateName) {
+        return { success: false, error: "Meta: nombre de plantilla vacío." };
+      }
+
+      const languageCode = (msg.languageCode?.trim() || "es_AR").replace(/-/g, "_");
+      const keys = Object.keys(msg.variables).sort((a, b) => {
+        const na = Number(a);
+        const nb = Number(b);
+        if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
+        return a.localeCompare(b);
+      });
+      const parameters = keys.map((k) => ({
+        type: "text" as const,
+        text: String(msg.variables[k] ?? ""),
+      }));
+      const components =
+        parameters.length > 0 ? [{ type: "body" as const, parameters }] : [];
+
+      const res = await fetch(
+        `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: recipient,
+            type: "template",
+            template: {
+              name: templateName,
+              language: { code: languageCode },
+              ...(components.length ? { components } : {}),
+            },
+          }),
+        }
+      );
+
+      if (!res.ok) {
+        const data = (await res.json()) as Record<string, unknown>;
+        const hint = hintForMetaJsonError(data);
+        return {
+          success: false,
+          error: `Meta API error ${res.status}: ${JSON.stringify(data)}.${hint}`,
+        };
+      }
+
+      const data = (await res.json()) as { messages?: { id?: string }[] };
+      return { success: true, externalId: data?.messages?.[0]?.id };
+    } catch (err) {
+      return { success: false, error: String(err) };
+    }
+  }
 }
 
 // ─── Twilio Provider ───────────────────────────────────────────────────────────
 
 /** Twilio exige E.164 sin espacios; acepta "+1 318 …" o "whatsapp:+1 318 …" en .env. */
-function normalizeTwilioWhatsAppAddress(raw: string): string {
+export function normalizeTwilioWhatsAppAddress(raw: string): string {
   const trimmed = raw.trim();
   const hasWa = trimmed.toLowerCase().startsWith("whatsapp:");
   const inner = hasWa ? trimmed.slice("whatsapp:".length).trim() : trimmed;
@@ -157,7 +251,8 @@ function normalizeTwilioWhatsAppAddress(raw: string): string {
   return hasWa ? `whatsapp:${e164}` : e164;
 }
 
-class TwilioProvider implements WhatsAppProvider {
+/** Instancia Twilio con credenciales explícitas (p. ej. bot inbound por negocio). */
+export class TwilioProvider implements WhatsAppProvider {
   private readonly accountSid: string;
   private readonly authToken: string;
   private readonly fromNumber: string; // "whatsapp:+14155238886"
@@ -300,6 +395,15 @@ export function getWhatsAppProvider(): WhatsAppProvider {
   );
 }
 
+/** Crea proveedor Twilio (mismo que usa getWhatsAppProvider cuando WHATSAPP_PROVIDER=twilio). */
+export function createTwilioProvider(config: {
+  accountSid: string;
+  authToken: string;
+  fromNumber: string;
+}): WhatsAppProvider {
+  return new TwilioProvider(config);
+}
+
 // ─── Message templates ────────────────────────────────────────────────────────
 
 /** Placeholders: {clientName}, {serviceName}, {manicuristName}, {date}, {time}. Use *text* for bold in WhatsApp. */
@@ -407,6 +511,24 @@ export function buildConfirmationTwilioContentVariables(params: {
     "1": params.clientName,
     "2": `${date}, ${time} — ${params.serviceName}`,
     "3": params.manicuristName,
+  };
+}
+
+/**
+ * Variables para plantilla Twilio/Meta de cancelación ({{1}} nombre, {{2}} fecha/hora/servicio, {{3}} fijo o guion).
+ * Debe coincidir con el BODY aprobado en Twilio Content o en WhatsApp Manager.
+ */
+export function buildCancellationTwilioContentVariables(params: {
+  clientName: string;
+  serviceName: string;
+  startAt: Date;
+}): Record<string, string> {
+  const date = formatDateShort(params.startAt);
+  const time = formatTime(params.startAt);
+  return {
+    "1": params.clientName,
+    "2": `${date}, ${time} — ${params.serviceName}`,
+    "3": "—",
   };
 }
 

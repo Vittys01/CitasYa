@@ -69,9 +69,26 @@ model Business {
   services      Service[]
   appSettings   AppSetting[]
   appointments  Appointment[]
+  whatsappBotSessions WhatsAppBotSession[]
 
   @@index([ownerId])
   @@index([slug])
+}
+
+/// Estado del flujo de agendado por WhatsApp (Twilio inbound).
+model WhatsAppBotSession {
+  id          String   @id @default(cuid())
+  businessId  String
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  /// E.164 con + (ej. +54911…), sin prefijo whatsapp:
+  phoneE164   String
+  step        String   @default("idle") // idle | manicurist | service | date | slot
+  data        Json?
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  @@unique([businessId, phoneE164])
+  @@index([businessId])
 }
 
 // ─── Users & Auth ─────────────────────────────────────────────────────────────
