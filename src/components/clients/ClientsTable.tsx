@@ -53,25 +53,28 @@ export default function ClientsTable({ clients, meta, query, settings }: Clients
         </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-[#FFFDF5] rounded-xl border border-[#e6d5c3] shadow-warm-sm overflow-hidden">
-        {/* Table header */}
-        <div className="bg-[#f5ebe0] border-b border-[#e6d5c3]">
-          <table className="w-full">
-            <thead>
-              <tr className="text-left">
-                <th className="px-5 py-3.5 text-[10px] font-bold text-earth-muted uppercase tracking-wider">{get(settings, "table.clientColumn", "Cliente")}</th>
-                <th className="px-5 py-3.5 text-[10px] font-bold text-earth-muted uppercase tracking-wider">{get(settings, "table.phone", "Teléfono")}</th>
-                <th className="px-5 py-3.5 text-[10px] font-bold text-earth-muted uppercase tracking-wider hidden md:table-cell">{get(settings, "table.email", "Email")}</th>
-                <th className="px-5 py-3.5 text-[10px] font-bold text-earth-muted uppercase tracking-wider">{get(settings, "table.appointments", "Turnos")}</th>
-                <th className="px-5 py-3.5 text-[10px] font-bold text-earth-muted uppercase tracking-wider hidden lg:table-cell">{get(settings, "table.notes", "Notas")}</th>
-              </tr>
-            </thead>
-          </table>
-        </div>
-
-        {/* Table body */}
-        <table className="w-full">
+      {/* Una sola tabla: el thead separado rompía el alineado de columnas (p. ej. sin email). */}
+      <div className="bg-[#FFFDF5] rounded-xl border border-[#e6d5c3] shadow-warm-sm overflow-x-auto">
+        <table className="w-full min-w-[640px] table-fixed border-collapse">
+          <thead className="bg-[#f5ebe0] border-b border-[#e6d5c3]">
+            <tr className="text-left">
+              <th className="w-[28%] px-5 py-3.5 text-[10px] font-bold text-earth-muted uppercase tracking-wider">
+                {get(settings, "table.clientColumn", "Cliente")}
+              </th>
+              <th className="w-[22%] px-5 py-3.5 text-[10px] font-bold text-earth-muted uppercase tracking-wider">
+                {get(settings, "table.phone", "Teléfono")}
+              </th>
+              <th className="hidden w-[22%] px-5 py-3.5 text-[10px] font-bold text-earth-muted uppercase tracking-wider md:table-cell">
+                {get(settings, "table.email", "Email")}
+              </th>
+              <th className="w-[12%] px-5 py-3.5 text-[10px] font-bold text-earth-muted uppercase tracking-wider">
+                {get(settings, "table.appointments", "Turnos")}
+              </th>
+              <th className="hidden w-[16%] px-5 py-3.5 text-[10px] font-bold text-earth-muted uppercase tracking-wider lg:table-cell">
+                {get(settings, "table.notes", "Notas")}
+              </th>
+            </tr>
+          </thead>
           <tbody className="divide-y divide-[#f0ede8]">
             {clients.length === 0 ? (
               <tr>
@@ -104,8 +107,10 @@ export default function ClientsTable({ clients, meta, query, settings }: Clients
                       {client.phone}
                     </span>
                   </td>
-                  <td className="px-5 py-3.5 hidden md:table-cell">
-                    <span className="text-sm text-earth-muted">{client.email ?? "—"}</span>
+                  <td className="hidden px-5 py-3.5 align-top md:table-cell">
+                    <span className="block truncate text-sm text-earth-muted" title={client.email ?? undefined}>
+                      {client.email?.trim() ? client.email : "—"}
+                    </span>
                   </td>
                   <td className="px-5 py-3.5">
                     <span className="inline-flex items-center gap-1.5 text-xs font-semibold bg-primary/10 text-primary-dark px-2.5 py-1 rounded-full border border-primary/20">

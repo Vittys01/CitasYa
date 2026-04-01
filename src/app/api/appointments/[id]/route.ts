@@ -17,6 +17,7 @@ import { z } from "zod";
 const appointmentServiceSchema = z.object({
   serviceId: z.string().cuid(),
   durationMinutes: z.number().int().positive().optional(),
+  price: z.number().min(0).optional(),
 });
 
 const updateSchema = z.object({
@@ -28,6 +29,7 @@ const updateSchema = z.object({
   serviceId: z.string().cuid().optional(),
   services: z.array(appointmentServiceSchema).optional(),
   price: z.number().min(0).optional(),
+  totalDurationMinutes: z.number().int().min(5).max(1440).optional(),
   sendWhatsApp: z.boolean().optional(),
 });
 

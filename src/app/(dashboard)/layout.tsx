@@ -30,11 +30,13 @@ export default async function DashboardLayout({
   const settings = await getAppSettings(businessId);
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
+    <div className="flex h-dvh max-h-dvh min-h-0 w-full bg-gray-50 overflow-hidden">
       <Sidebar role={session.user.role} settings={settings} />
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <TopBar user={session.user} settings={settings} />
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+        <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-6">
+          {children}
+        </main>
       </div>
     </div>
   );

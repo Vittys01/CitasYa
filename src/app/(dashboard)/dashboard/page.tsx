@@ -30,7 +30,7 @@ export default async function DashboardPage() {
   const todayApptsForClient = todayAppts.map(serializeAppointmentPrice);
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">{settings["nav.dashboard"] ?? "Dashboard"}</h1>
         <p className="text-gray-500 text-sm mt-1">
@@ -40,13 +40,15 @@ export default async function DashboardPage() {
 
       <StatsCards stats={stats} settings={settings} />
 
-      <div className={`grid grid-cols-1 gap-6 ${!isManicurist ? "lg:grid-cols-3" : ""}`}>
+      <div
+        className={`grid min-w-0 grid-cols-1 gap-6 ${!isManicurist ? "lg:grid-cols-3" : ""}`}
+      >
         {!isManicurist && (
-          <div className="lg:col-span-2">
+          <div className="min-w-0 lg:col-span-2">
             <ProductivityChart data={productivity} settings={settings} />
           </div>
         )}
-        <div className={isManicurist ? "max-w-lg" : ""}>
+        <div className={isManicurist ? "max-w-lg min-w-0" : "min-w-0"}>
           <TodayAppointments appointments={todayApptsForClient} settings={settings} />
         </div>
       </div>

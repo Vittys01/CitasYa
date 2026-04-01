@@ -61,6 +61,8 @@ export type ClientWithHistory = Client & {
 export interface AppointmentServiceInput {
   serviceId: string;
   durationMinutes?: number; // null/undefined = usar duración del servicio
+  /** Precio de esta línea en la cita (si no se envía, usa el precio del catálogo). */
+  price?: number;
 }
 
 export interface CreateAppointmentInput {
@@ -74,6 +76,8 @@ export interface CreateAppointmentInput {
   notes?: string;
   /** Precio total override (solo para esta cita, ej: diseño extra, adicionales) */
   price?: number;
+  /** Duración del bloque en el calendario (min). Si no se envía, suma de las líneas. */
+  totalDurationMinutes?: number;
   /** Si es false, no se envía confirmación por WhatsApp ni se programa recordatorio. Por defecto true. */
   sendWhatsApp?: boolean;
 }
@@ -90,6 +94,8 @@ export interface UpdateAppointmentInput {
   services?: AppointmentServiceInput[];
   /** Precio total override (solo para esta cita) */
   price?: number;
+  /** Duración del bloque en el calendario (min). Si no se envía, suma de las líneas. */
+  totalDurationMinutes?: number;
   /** Si es false, al guardar se cancela el recordatorio y no se reprograma (ni confirmación en creación). Por defecto true. */
   sendWhatsApp?: boolean;
 }

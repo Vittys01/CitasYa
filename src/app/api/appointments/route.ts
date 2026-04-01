@@ -10,6 +10,7 @@ import { apiError, apiSuccess } from "@/lib/utils";
 import {
   createAppointment,
   getAppointmentsByDate,
+  getAppointmentsByMonth,
   getAppointmentsByWeek,
 } from "@/services/appointment.service";
 import { z } from "zod";
@@ -17,6 +18,7 @@ import { z } from "zod";
 const appointmentServiceSchema = z.object({
   serviceId: z.string().cuid(),
   durationMinutes: z.number().int().positive().optional(),
+  price: z.number().min(0).optional(),
 });
 
 const createSchema = z.object({
@@ -27,6 +29,7 @@ const createSchema = z.object({
   startAt: z.string().datetime(),
   notes: z.string().optional(),
   price: z.number().min(0).optional(),
+  totalDurationMinutes: z.number().int().min(5).max(1440).optional(),
   sendWhatsApp: z.boolean().optional(),
 }).refine(
   (d) => d.serviceId || (d.services && d.services.length > 0),
@@ -42,10 +45,16 @@ export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
   const date = searchParams.get("date");
   const weekStart = searchParams.get("weekStart");
+  /** Primer día del mes en ISO (ej. 2025-03-01) para vista mes */
+  const month = searchParams.get("month");
   const manicuristId = searchParams.get("manicuristId") ?? undefined;
   const options = { businessId, manicuristId };
 
   try {
+    if (month) {
+      const data = await getAppointmentsByMonth(new Date(month), options);
+      return NextResponse.json(apiSuccess(data));
+    }
     if (weekStart) {
       const data = await getAppointmentsByWeek(new Date(weekStart), options);
       return NextResponse.json(apiSuccess(data));

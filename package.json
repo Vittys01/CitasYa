@@ -2,6 +2,9 @@
   "name": "dates-saas",
   "version": "1.0.0",
   "private": true,
+  "pnpm": {
+    "shamefullyHoist": true
+  },
   "engines": {
     "node": "20.x"
   },
@@ -56,6 +59,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@alloc/quick-lru": "5.2.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20",
     "@types/react": "^19",

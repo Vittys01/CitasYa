@@ -47,7 +47,32 @@ type NewClientForm = {
 
 const g = (s: Record<string, string> | undefined, k: string, fb: string) => (s && s[k]) ?? fb;
 
-type SelectedService = { serviceId: string; durationMinutes?: number; durationDisplay?: string };
+type SelectedService = {
+  serviceId: string;
+  durationMinutes?: number;
+  durationDisplay?: string;
+  /** Precio de esta línea (si no, catálogo). */
+  price?: number;
+  priceDisplay?: string;
+};
+
+function lineDurationMinutes(item: SelectedService, svc: ServiceForClient | undefined): number {
+  const d =
+    item.durationDisplay !== undefined
+      ? parseInt(item.durationDisplay, 10)
+      : item.durationMinutes;
+  return Number.isNaN(d) || d === undefined ? (svc?.duration ?? 0) : d;
+}
+
+function linePriceAmount(item: SelectedService, svc: ServiceForClient | undefined): number {
+  if (item.priceDisplay !== undefined) {
+    const raw = item.priceDisplay.replace(",", ".").trim();
+    if (raw === "") return Number(svc?.price ?? 0);
+    const v = parseFloat(raw.replace(",", "."));
+    return Number.isNaN(v) ? Number(svc?.price ?? 0) : Math.max(0, v);
+  }
+  return item.price ?? Number(svc?.price ?? 0);
+}
 
 const schema = z.object({
   clientId:     z.string().min(1),
@@ -113,20 +138,35 @@ export default function NewAppointmentButton({
   const [selectedServices, setSelectedServices] = useState<SelectedService[]>([]);
   const totalDuration = selectedServices.reduce((sum, item) => {
     const svc = services.find((s) => s.id === item.serviceId);
-    const d = item.durationDisplay !== undefined
-    ? parseInt(item.durationDisplay, 10)
-    : item.durationMinutes;
-  return sum + (Number.isNaN(d) || d === undefined ? (svc?.duration ?? 0) : d);
+    return sum + lineDurationMinutes(item, svc);
   }, 0);
   const totalPrice = selectedServices.reduce((sum, item) => {
     const svc = services.find((s) => s.id === item.serviceId);
-    return sum + (svc ? Number(svc.price) : 0);
+    return sum + linePriceAmount(item, svc);
   }, 0);
   const firstServiceId = selectedServices[0]?.serviceId ?? "";
 
+  /** Duración del bloque en el calendario (puede diferir de la suma de líneas). */
+  const [apptDurationOverride, setApptDurationOverride] = useState<number | null>(null);
+  const [apptDurationDisplay, setApptDurationDisplay] = useState<string | undefined>(undefined);
+
+  const effectiveSlotDuration = (() => {
+    if (apptDurationDisplay !== undefined) {
+      const raw = apptDurationDisplay.replace(/\D/g, "");
+      if (raw === "") return Math.max(5, totalDuration || 5);
+      const n = parseInt(raw, 10);
+      if (!Number.isNaN(n)) return Math.min(1440, Math.max(5, n));
+    }
+    if (apptDurationOverride != null) return apptDurationOverride;
+    return Math.max(1, totalDuration);
+  })();
+
   const [priceOverride, setPriceOverride] = useState<number | null>(null);
-  useEffect(() => { setPriceOverride(null); }, [selectedServices]);
+  /** Texto libre mientras el usuario edita el precio (evita que el valor numérico “salte” al borrar). */
+  const [priceDisplay, setPriceDisplay] = useState<string | undefined>(undefined);
   const finalPrice = priceOverride ?? totalPrice;
+  const priceFieldValue =
+    priceDisplay !== undefined ? priceDisplay : String(priceOverride ?? totalPrice);
 
   // ── Slot state ──────────────────────────────────────────────────────────────
   const [manicuristFilter, setManicuristFilter] = useState<string>(lockedManicuristId ?? "");
@@ -242,14 +282,14 @@ export default function NewAppointmentButton({
   useEffect(() => {
     const controller = new AbortController();
     const serviceId = firstServiceId;
-    const duration = totalDuration;
+    const duration = effectiveSlotDuration;
     if (pickerDate) {
       loadSlotsForDate(serviceId, duration, pickerDate, manicuristFilter, controller.signal);
     } else {
       loadSlotsNext(serviceId, duration, manicuristFilter, controller.signal);
     }
     return () => controller.abort();
-  }, [firstServiceId, totalDuration, manicuristFilter, pickerDate, loadSlotsNext, loadSlotsForDate]);
+  }, [firstServiceId, effectiveSlotDuration, manicuristFilter, pickerDate, loadSlotsNext, loadSlotsForDate]);
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
   function formatSlot(s: SlotOption) {
@@ -269,6 +309,9 @@ export default function NewAppointmentButton({
     reset();
     setSelectedServices([]);
     setPriceOverride(null);
+    setPriceDisplay(undefined);
+    setApptDurationOverride(null);
+    setApptDurationDisplay(undefined);
     setManicuristFilter(lockedManicuristId ?? "");
     setPickerDate("");
     setSlotOptions([]);
@@ -325,10 +368,17 @@ export default function NewAppointmentButton({
         ? a.services.map((s) => ({
             serviceId: s.serviceId,
             durationMinutes: s.durationMinutes ?? undefined,
+            price: s.price,
           }))
         : [{ serviceId: a.serviceId }]
     );
     setPriceOverride(Number(a.price));
+    setPriceDisplay(undefined);
+    const endMs = new Date(a.endAt as string).getTime();
+    const startMs = new Date(a.startAt as string).getTime();
+    const blockMins = Math.max(5, Math.round((endMs - startMs) / 60000));
+    setApptDurationOverride(blockMins);
+    setApptDurationDisplay(undefined);
     setValue("clientId", a.clientId, { shouldValidate: true });
     setValue("manicuristId", a.manicuristId, { shouldValidate: true });
     setValue("notes", a.notes ?? "", { shouldValidate: false });
@@ -368,17 +418,33 @@ export default function NewAppointmentButton({
       return;
     }
     try {
-      const servicesPayload = selectedServices.map((s) => ({
-        serviceId: s.serviceId,
-        ...(s.durationMinutes != null && { durationMinutes: s.durationMinutes }),
-      }));
+      const servicesPayload = selectedServices.map((s) => {
+        const svc = services.find((x) => x.id === s.serviceId);
+        const dur = lineDurationMinutes(s, svc);
+        const priceLine = linePriceAmount(s, svc);
+        return {
+          serviceId: s.serviceId,
+          durationMinutes: dur,
+          price: priceLine,
+        };
+      });
+      const priceForSubmit = (() => {
+        if (priceDisplay !== undefined) {
+          const raw = priceDisplay.replace(",", ".").trim();
+          if (raw === "") return totalPrice;
+          const v = parseFloat(raw);
+          if (!Number.isNaN(v)) return Math.max(0, v);
+        }
+        return priceOverride ?? totalPrice;
+      })();
       const body = {
         clientId: data.clientId,
         manicuristId: data.manicuristId,
         services: servicesPayload,
         startAt: new Date(data.startAt).toISOString(),
         notes: data.notes,
-        price: finalPrice,
+        price: priceForSubmit,
+        totalDurationMinutes: effectiveSlotDuration,
         sendWhatsApp,
       };
 
@@ -612,62 +678,124 @@ export default function NewAppointmentButton({
                 <div className="space-y-3">
                   {selectedServices.map((item, idx) => {
                     const svc = services.find((s) => s.id === item.serviceId);
-                    const dur = item.durationMinutes ?? svc?.duration ?? 0;
+                    const dur = lineDurationMinutes(item, svc);
                     const displayValue = item.durationDisplay !== undefined
                       ? item.durationDisplay
                       : String(dur);
+                    const lineP = linePriceAmount(item, svc);
+                    const priceField =
+                      item.priceDisplay !== undefined ? item.priceDisplay : String(lineP);
                     return (
                       <div
                         key={`${item.serviceId}-${idx}`}
-                        className="flex items-center gap-2 p-3 rounded-xl border border-primary/20 bg-primary/5"
+                        className="flex items-start gap-2 p-3 rounded-xl border border-primary/20 bg-primary/5"
                       >
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold text-earth truncate">{svc?.name ?? "—"}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-[10px] text-earth-muted">{g(settings, "form.field.duration", "Duración")}:</span>
-                            <input
-                              type="number"
-                              min={5}
-                              max={480}
-                              step={5}
-                              value={displayValue}
-                              onChange={(e) => {
-                                const raw = e.target.value;
-                                setSelectedServices((prev) =>
-                                  prev.map((s, i) =>
-                                    i === idx
-                                      ? {
-                                          ...s,
-                                          durationDisplay: raw,
-                                          durationMinutes: raw === "" ? undefined : (parseInt(raw, 10) || undefined),
-                                        }
-                                      : s
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mt-2">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] text-earth-muted whitespace-nowrap">
+                                {g(settings, "form.field.duration", "Duración")}:
+                              </span>
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                autoComplete="off"
+                                value={displayValue}
+                                onChange={(e) => {
+                                  const raw = e.target.value.replace(/\D/g, "");
+                                  const n = raw === "" ? NaN : parseInt(raw, 10);
+                                  setSelectedServices((prev) =>
+                                    prev.map((s, i) =>
+                                      i === idx
+                                        ? {
+                                            ...s,
+                                            durationDisplay: raw,
+                                            durationMinutes:
+                                              raw === "" || Number.isNaN(n) ? undefined : n,
+                                          }
+                                        : s
+                                    )
+                                  );
+                                }}
+                                onBlur={(e) => {
+                                  const raw = e.target.value.replace(/\D/g, "");
+                                  const v = parseInt(raw, 10);
+                                  if (raw === "" || Number.isNaN(v)) {
+                                    setSelectedServices((prev) =>
+                                      prev.map((s, i) =>
+                                        i === idx
+                                          ? { ...s, durationDisplay: undefined, durationMinutes: undefined }
+                                          : s
+                                      )
+                                    );
+                                  } else {
+                                    const clamped = Math.min(480, Math.max(5, v));
+                                    setSelectedServices((prev) =>
+                                      prev.map((s, i) =>
+                                        i === idx
+                                          ? { ...s, durationDisplay: undefined, durationMinutes: clamped }
+                                          : s
+                                      )
+                                    );
+                                  }
+                                }}
+                                className="w-14 px-2 py-1 text-xs border border-[#D7CCC8] rounded bg-white"
+                              />
+                              <span className="text-[10px] text-earth-muted">{g(settings, "common.minutes", "min")}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className="text-[10px] text-earth-muted whitespace-nowrap">
+                                {g(settings, "form.field.linePrice", "Cobro")}:
+                              </span>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                autoComplete="off"
+                                value={priceField}
+                                onChange={(e) =>
+                                  setSelectedServices((prev) =>
+                                    prev.map((s, i) =>
+                                      i === idx ? { ...s, priceDisplay: e.target.value } : s
+                                    )
                                   )
-                                );
-                              }}
-                              onBlur={(e) => {
-                                const raw = e.target.value;
-                                const v = parseInt(raw, 10);
-                                if (raw === "" || Number.isNaN(v)) {
-                                  setSelectedServices((prev) =>
-                                    prev.map((s, i) =>
-                                      i === idx ? { ...s, durationDisplay: undefined, durationMinutes: undefined } : s
-                                    )
-                                  );
-                                } else {
-                                  setSelectedServices((prev) =>
-                                    prev.map((s, i) =>
-                                      i === idx ? { ...s, durationDisplay: undefined, durationMinutes: v } : s
-                                    )
-                                  );
                                 }
-                              }}
-                              className="w-16 px-2 py-1 text-xs border border-[#D7CCC8] rounded bg-white"
-                            />
-                            <span className="text-[10px] text-earth-muted">{g(settings, "common.minutes", "min")}</span>
+                                onBlur={(e) => {
+                                  const raw = e.target.value.replace(",", ".").trim();
+                                  if (raw === "") {
+                                    setSelectedServices((prev) =>
+                                      prev.map((s, i) =>
+                                        i === idx ? { ...s, priceDisplay: undefined, price: undefined } : s
+                                      )
+                                    );
+                                    return;
+                                  }
+                                  const v = parseFloat(raw.replace(",", "."));
+                                  if (Number.isNaN(v)) {
+                                    setSelectedServices((prev) =>
+                                      prev.map((s, i) =>
+                                        i === idx ? { ...s, priceDisplay: undefined } : s
+                                      )
+                                    );
+                                    return;
+                                  }
+                                  setSelectedServices((prev) =>
+                                    prev.map((s, i) =>
+                                      i === idx
+                                        ? {
+                                            ...s,
+                                            priceDisplay: undefined,
+                                            price: Math.max(0, v),
+                                          }
+                                        : s
+                                    )
+                                  );
+                                }}
+                                className="w-24 min-w-0 px-2 py-1 text-xs border border-[#D7CCC8] rounded bg-white"
+                              />
+                            </div>
                           </div>
                         </div>
-                        <span className="text-sm font-bold text-earth shrink-0">{formatPrice(svc ? Number(svc.price) : 0, settings)}</span>
                         <button
                           type="button"
                           onClick={() => setSelectedServices((prev) => prev.filter((_, i) => i !== idx))}
@@ -701,23 +829,69 @@ export default function NewAppointmentButton({
                   </select>
                   {selectedServices.length > 0 && (
                     <div className="bg-primary/5 rounded-xl border border-primary/20 p-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-full bg-white shadow-warm-sm flex items-center justify-center">
+                      <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-9 h-9 rounded-full bg-white shadow-warm-sm flex items-center justify-center shrink-0">
                             <span className="material-symbols-outlined text-primary-dark text-[18px]">schedule</span>
                           </div>
-                          <div>
-                            <p className="text-[10px] text-earth-muted font-medium">{g(settings, "form.field.duration", "Duración total")}</p>
-                            <p className="text-sm font-bold text-earth">{totalDuration} {g(settings, "common.minutes", "min")}</p>
+                          <div className="min-w-0">
+                            <p className="text-[10px] text-earth-muted font-medium">
+                              {g(settings, "form.field.appointmentDuration", "Duración total (cita)")}
+                            </p>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                autoComplete="off"
+                                value={
+                                  apptDurationDisplay !== undefined
+                                    ? apptDurationDisplay
+                                    : String(apptDurationOverride ?? totalDuration)
+                                }
+                                onChange={(e) =>
+                                  setApptDurationDisplay(e.target.value.replace(/\D/g, ""))
+                                }
+                                onBlur={() => {
+                                  if (apptDurationDisplay === undefined) return;
+                                  const raw = apptDurationDisplay.replace(/\D/g, "");
+                                  if (raw === "") {
+                                    setApptDurationOverride(null);
+                                    setApptDurationDisplay(undefined);
+                                    return;
+                                  }
+                                  const v = parseInt(raw, 10);
+                                  if (Number.isNaN(v)) {
+                                    setApptDurationDisplay(undefined);
+                                    return;
+                                  }
+                                  setApptDurationOverride(Math.min(1440, Math.max(5, v)));
+                                  setApptDurationDisplay(undefined);
+                                }}
+                                className="w-16 px-2 py-1 text-sm font-bold text-earth border border-[#D7CCC8] rounded bg-white"
+                              />
+                              <span className="text-xs text-earth-muted">
+                                {g(settings, "common.minutes", "min")}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-earth-muted/80 mt-1">
+                              {g(
+                                settings,
+                                "form.field.sumLineDuration",
+                                "Suma servicios:"
+                              )}{" "}
+                              {totalDuration} {g(settings, "common.minutes", "min")}
+                            </p>
                           </div>
                         </div>
-                        <div className="w-px h-8 bg-[#e6d5c3]" />
+                        <div className="w-px h-8 bg-[#e6d5c3] hidden sm:block" />
                         <div className="flex items-center gap-3">
                           <div className="w-9 h-9 rounded-full bg-white shadow-warm-sm flex items-center justify-center">
                             <span className="material-symbols-outlined text-emerald-600 text-[18px]">payments</span>
                           </div>
                           <div>
-                            <p className="text-[10px] text-earth-muted font-medium">{g(settings, "form.field.total", "Total")}</p>
+                            <p className="text-[10px] text-earth-muted font-medium">
+                              {g(settings, "form.field.totalServices", "Total servicios")}
+                            </p>
                             <p className="text-sm font-bold text-earth">{formatPrice(totalPrice, settings)}</p>
                           </div>
                         </div>
@@ -728,13 +902,26 @@ export default function NewAppointmentButton({
                           <span className="text-earth-muted/70 ml-1">({g(settings, "form.field.priceOverrideHelp", "diseño extra, adicionales")})</span>
                         </label>
                         <input
-                          type="number"
-                          min={0}
-                          step={0.01}
-                          value={finalPrice}
-                          onChange={(e) => {
-                            const v = parseFloat(e.target.value);
-                            setPriceOverride(Number.isNaN(v) ? null : v);
+                          type="text"
+                          inputMode="decimal"
+                          autoComplete="off"
+                          value={priceFieldValue}
+                          onChange={(e) => setPriceDisplay(e.target.value)}
+                          onBlur={() => {
+                            if (priceDisplay === undefined) return;
+                            const raw = priceDisplay.replace(",", ".").trim();
+                            if (raw === "") {
+                              setPriceOverride(null);
+                              setPriceDisplay(undefined);
+                              return;
+                            }
+                            const v = parseFloat(raw);
+                            if (Number.isNaN(v)) {
+                              setPriceDisplay(undefined);
+                              return;
+                            }
+                            setPriceOverride(Math.max(0, v));
+                            setPriceDisplay(undefined);
                           }}
                           className="w-full px-3 py-2 text-sm border border-[#D7CCC8] rounded-lg bg-white"
                           placeholder={String(totalPrice)}

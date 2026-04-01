@@ -18,7 +18,7 @@ export default function TopBar({ user, settings }: TopBarProps) {
   const items = getNavItems(user.role as "OWNER" | "ADMIN" | "MANICURIST" | "RECEPTIONIST");
 
   return (
-    <header className="h-14 bg-white border-b border-[#e6d5c3] flex items-center justify-between px-4 sm:px-6 shrink-0 z-10 gap-2">
+    <header className="min-h-14 shrink-0 z-10 flex items-center justify-between gap-2 border-b border-[#e6d5c3] bg-white px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6">
       {/* Left: nav links (solo cuando no hay sidebar = no desktop) */}
       <nav className="flex xl:hidden items-center gap-0.5 overflow-x-auto no-scrollbar min-w-0">
         {items.map(({ href, key, icon, labelEs }) => {

@@ -7,7 +7,7 @@
  *   - Programar WhatsApp (confirmación / recordatorio) sin Redis
  */
 
-import { addDays, format, isSameDay } from "date-fns";
+import { addDays, endOfMonth, format, isSameDay, startOfMonth } from "date-fns";
 import { es } from "date-fns/locale";
 import { prisma } from "@/lib/db";
 import {
@@ -145,13 +145,20 @@ export async function createAppointment(
     if (!svc) throw new Error(`Servicio ${item.serviceId} no encontrado.`);
     const dur = item.durationMinutes ?? svc.duration;
     totalDuration += dur;
-    totalPrice += Number(svc.price);
+    const linePrice =
+      item.price != null && item.price >= 0 ? item.price : Number(svc.price);
+    totalPrice += linePrice;
   }
 
   const finalPrice = input.price != null && input.price >= 0 ? input.price : totalPrice;
 
+  const slotDuration =
+    input.totalDurationMinutes != null && input.totalDurationMinutes >= 5
+      ? input.totalDurationMinutes
+      : totalDuration;
+
   const startAt = new Date(input.startAt);
-  const endAt = calcEndTime(startAt, totalDuration);
+  const endAt = calcEndTime(startAt, slotDuration);
 
   const available = await isSlotAvailable(input.manicuristId, startAt, endAt);
   if (!available) {
@@ -182,11 +189,12 @@ export async function createAppointment(
       services: {
         create: serviceItems.map((item, i) => {
           const svc = serviceMap.get(item.serviceId)!;
-          const dur = item.durationMinutes ?? svc.duration;
+          const linePrice =
+            item.price != null && item.price >= 0 ? item.price : Number(svc.price);
           return {
             serviceId: item.serviceId,
             durationMinutes: item.durationMinutes ?? null,
-            price: svc.price,
+            price: linePrice,
             sortOrder: i,
           };
         }),
@@ -232,11 +240,17 @@ export async function updateAppointment(
       if (!svc) throw new Error(`Servicio ${item.serviceId} no encontrado.`);
       const dur = item.durationMinutes ?? svc.duration;
       totalDuration += dur;
-      totalPrice += Number(svc.price);
+      const linePrice =
+        item.price != null && item.price >= 0 ? item.price : Number(svc.price);
+      totalPrice += linePrice;
     }
 
     const startAt = input.startAt ? new Date(input.startAt) : existing.startAt;
-    const endAt = calcEndTime(startAt, totalDuration);
+    const slotDuration =
+      input.totalDurationMinutes != null && input.totalDurationMinutes >= 5
+        ? input.totalDurationMinutes
+        : totalDuration;
+    const endAt = calcEndTime(startAt, slotDuration);
     const manicuristId = input.manicuristId ?? existing.manicuristId;
     const clientId = input.clientId ?? existing.clientId;
     const finalPrice = input.price != null && input.price >= 0 ? input.price : totalPrice;
@@ -255,12 +269,14 @@ export async function updateAppointment(
       for (let i = 0; i < serviceItems.length; i++) {
         const item = serviceItems[i];
         const svc = serviceMap.get(item.serviceId)!;
+        const linePrice =
+          item.price != null && item.price >= 0 ? item.price : Number(svc.price);
         await tx.appointmentService.create({
           data: {
             appointmentId: id,
             serviceId: item.serviceId,
             durationMinutes: item.durationMinutes ?? null,
-            price: svc.price,
+            price: linePrice,
             sortOrder: i,
           },
         });
@@ -401,6 +417,27 @@ export async function getAppointmentsByWeek(
   const rows = await prisma.appointment.findMany({
     where: {
       startAt: { gte: weekStart, lt: end },
+      ...(options?.businessId ? { businessId: options.businessId } : {}),
+      ...(options?.manicuristId ? { manicuristId: options.manicuristId } : {}),
+    },
+    include: appointmentInclude,
+    orderBy: { startAt: "asc" },
+  });
+
+  return rows as AppointmentWithRelations[];
+}
+
+/** Citas con `startAt` en el mes calendario de `month` (cualquier día 1–último). */
+export async function getAppointmentsByMonth(
+  month: Date,
+  options?: { manicuristId?: string; businessId?: string }
+): Promise<AppointmentWithRelations[]> {
+  const start = startOfMonth(month);
+  const end = endOfMonth(month);
+
+  const rows = await prisma.appointment.findMany({
+    where: {
+      startAt: { gte: start, lte: end },
       ...(options?.businessId ? { businessId: options.businessId } : {}),
       ...(options?.manicuristId ? { manicuristId: options.manicuristId } : {}),
     },

@@ -1,12 +1,18 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   format,
   addDays,
+  addMonths,
   startOfWeek,
+  endOfWeek,
+  startOfMonth,
+  endOfMonth,
+  eachDayOfInterval,
   isSameDay,
+  isSameMonth,
   differenceInMinutes,
   setHours,
   setMinutes,
@@ -163,28 +169,19 @@ export default function AppointmentsCalendar({
   const statusLabel = (status: string) => (settings && settings[`status.${status}`]) ?? defaultStatusLabel[status] ?? status;
   type StatusFilter = "all" | "PENDING" | "CONFIRMED" | "COMPLETED" | "CANCELLED";
 
-  const [view, setView]           = useState<"week" | "day">("week");
+  const [view, setView]           = useState<"month" | "week" | "day">("month");
   const [selectedDay, setSelectedDay] = useState(new Date());
+  const [monthCursor, setMonthCursor] = useState(() => startOfMonth(new Date()));
   const [weekStart, setWeekStart]  = useState(() =>
     startOfWeek(new Date(), { weekStartsOn: 1 })
   );
   const [filterMani, setFilterMani] = useState<string>("all");
-  const mobileDefaultApplied = useRef(false);
-
-  // En móvil: por defecto vista día + una persona
-  useEffect(() => {
-    if (typeof window === "undefined" || mobileDefaultApplied.current) return;
-    const isMobile = window.innerWidth < 768;
-    if (isMobile && manicurists.length > 0) {
-      mobileDefaultApplied.current = true;
-      setView("day");
-      setFilterMani(manicurists[0].id);
-    }
-  }, [manicurists]);
   const [filterStatus, setFilterStatus] = useState<StatusFilter>("all");
   const [appointments, setAppointments] = useState<AppointmentForClient[]>(initialAppointments);
   const [fetchedByWeek, setFetchedByWeek] = useState<Record<string, AppointmentForClient[]>>({});
   const [loadingWeek, setLoadingWeek] = useState<string | null>(null);
+  const [fetchedByMonth, setFetchedByMonth] = useState<Record<string, AppointmentForClient[]>>({});
+  const [loadingMonth, setLoadingMonth] = useState<string | null>(null);
 
   // Sincronizar con datos del servidor cuando cambian (p. ej. tras crear turno y router.refresh())
   useEffect(() => {
@@ -208,6 +205,11 @@ export default function AppointmentsCalendar({
         const list = prev[apptWeek];
         return { ...prev, [apptWeek]: mergeList(list ?? []) };
       });
+      const apptMonth = format(new Date(appt.startAt), "yyyy-MM");
+      setFetchedByMonth((prev) => {
+        const list = prev[apptMonth];
+        return { ...prev, [apptMonth]: mergeList(list ?? []) };
+      });
     },
     [initialWeekStartKey]
   );
@@ -219,9 +221,11 @@ export default function AppointmentsCalendar({
   // Semana que estamos mostrando (en vista día es la semana del día seleccionado)
   const viewWeekStart = view === "week" ? weekStart : startOfWeek(selectedDay, { weekStartsOn: 1 });
   const viewWeekKey = format(viewWeekStart, "yyyy-MM-dd");
+  const viewMonthKey = format(monthCursor, "yyyy-MM");
 
   // Cargar citas de otras semanas desde la API
   useEffect(() => {
+    if (view === "month") return;
     if (viewWeekKey === initialWeekStartKey) return;
     if (fetchedByWeek[viewWeekKey] !== undefined) return;
 
@@ -242,11 +246,39 @@ export default function AppointmentsCalendar({
         if (!cancelled) setLoadingWeek(null);
       });
     return () => { cancelled = true; };
-  }, [viewWeekKey, initialWeekStartKey, lockedManicuristId]);
+  }, [view, viewWeekKey, initialWeekStartKey, lockedManicuristId]);
 
-  const displayAppointments = viewWeekKey === initialWeekStartKey
-    ? appointments
-    : (fetchedByWeek[viewWeekKey] ?? []);
+  // Vista mes: cargar todo el mes
+  useEffect(() => {
+    if (view !== "month") return;
+    if (fetchedByMonth[viewMonthKey] !== undefined) return;
+
+    let cancelled = false;
+    setLoadingMonth(viewMonthKey);
+    const params = new URLSearchParams({ month: startOfMonth(monthCursor).toISOString() });
+    if (lockedManicuristId) params.set("manicuristId", lockedManicuristId);
+    fetch(`/api/appointments?${params}`)
+      .then((res) => res.json())
+      .then((json) => {
+        if (cancelled) return;
+        const list = (json?.data ?? []).map((a: AppointmentForClient & { price?: unknown }) =>
+          typeof a.price === "number" ? a : { ...a, price: Number(a.price ?? 0) }
+        ) as AppointmentForClient[];
+        setFetchedByMonth((prev) => ({ ...prev, [viewMonthKey]: list }));
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingMonth(null);
+      });
+    return () => { cancelled = true; };
+  }, [view, viewMonthKey, monthCursor, lockedManicuristId]);
+
+  const displayAppointments = view === "month"
+    ? (fetchedByMonth[viewMonthKey] !== undefined
+        ? fetchedByMonth[viewMonthKey]!
+        : appointments.filter((a) => isSameMonth(new Date(a.startAt), monthCursor)))
+    : viewWeekKey === initialWeekStartKey
+      ? appointments
+      : (fetchedByWeek[viewWeekKey] ?? []);
 
   const [selectedAppointment, setSelectedAppointment] = useState<AppointmentForClient | null>(null);
   const [cancelling, setCancelling] = useState(false);
@@ -319,11 +351,15 @@ export default function AppointmentsCalendar({
     const today = new Date();
     setSelectedDay(today);
     setWeekStart(startOfWeek(today, { weekStartsOn: 1 }));
+    setMonthCursor(startOfMonth(today));
     setView("day");
   }, []);
 
   const prevWeek = useCallback(() => setWeekStart((d) => addDays(d, -7)), []);
   const nextWeek = useCallback(() => setWeekStart((d) => addDays(d, 7)), []);
+
+  const prevMonth = useCallback(() => setMonthCursor((d) => addMonths(d, -1)), []);
+  const nextMonth = useCallback(() => setMonthCursor((d) => addMonths(d, 1)), []);
 
   const prevDay = useCallback(() => {
     setSelectedDay((d) => addDays(d, -1));
@@ -341,6 +377,14 @@ export default function AppointmentsCalendar({
       }),
     [displayAppointments, filterMani, filterStatus]
   );
+
+  const monthCalendarDays = useMemo(() => {
+    const mStart = startOfMonth(monthCursor);
+    const mEnd = endOfMonth(monthCursor);
+    const gridStart = startOfWeek(mStart, { weekStartsOn: 1 });
+    const gridEnd = endOfWeek(mEnd, { weekStartsOn: 1 });
+    return eachDayOfInterval({ start: gridStart, end: gridEnd });
+  }, [monthCursor]);
 
   const viewDays = view === "week" ? days : [selectedDay];
 
@@ -401,12 +445,16 @@ export default function AppointmentsCalendar({
                     {(settings && settings["form.section.clientData"]) ?? "Cliente"}
                   </p>
                   <p className="text-sm font-semibold text-earth">{selectedAppointment.client.name}</p>
-                  {selectedAppointment.client.phone && (
-                    <p className="text-xs text-earth-muted mt-0.5">{selectedAppointment.client.phone}</p>
-                  )}
-                  {selectedAppointment.client.email && (
-                    <p className="text-xs text-earth-muted">{selectedAppointment.client.email}</p>
-                  )}
+                  <p className="mt-1.5 flex items-start gap-2 text-xs text-earth-muted">
+                    <span className="material-symbols-outlined mt-0.5 shrink-0 text-[15px] text-[#bda696]">phone</span>
+                    <span className="min-w-0 break-all">{selectedAppointment.client.phone || "—"}</span>
+                  </p>
+                  <p className="mt-1 flex items-start gap-2 text-xs text-earth-muted">
+                    <span className="material-symbols-outlined mt-0.5 shrink-0 text-[15px] text-[#bda696]">mail</span>
+                    <span className="min-w-0 break-all">
+                      {selectedAppointment.client.email?.trim() ? selectedAppointment.client.email : "—"}
+                    </span>
+                  </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <span
@@ -528,12 +576,28 @@ export default function AppointmentsCalendar({
         <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           <div className="flex items-center bg-[#f5ebe0] p-1 rounded-lg">
             <button
+              type="button"
+              onClick={() => {
+                setView("month");
+                setMonthCursor(startOfMonth(selectedDay));
+              }}
+              className={cn(
+                "px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-md transition-all",
+                view === "month"
+                  ? "bg-white text-earth shadow-warm-sm"
+                  : "text-earth-muted hover:text-earth"
+              )}
+            >
+              {(settings && settings["calendar.view.month"]) ?? "Mes"}
+            </button>
+            <button
+              type="button"
               onClick={() => {
                 setView("week");
                 setWeekStart(startOfWeek(selectedDay, { weekStartsOn: 1 }));
               }}
               className={cn(
-                "px-3 py-1.5 text-xs font-semibold rounded-md transition-all",
+                "px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-md transition-all",
                 view === "week"
                   ? "bg-white text-earth shadow-warm-sm"
                   : "text-earth-muted hover:text-earth"
@@ -542,9 +606,10 @@ export default function AppointmentsCalendar({
               {(settings && settings["calendar.view.week"]) ?? "Semana"}
             </button>
             <button
+              type="button"
               onClick={() => setView("day")}
               className={cn(
-                "px-3 py-1.5 text-xs font-semibold rounded-md transition-all",
+                "px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-md transition-all",
                 view === "day"
                   ? "bg-white text-earth shadow-warm-sm"
                   : "text-earth-muted hover:text-earth"
@@ -555,16 +620,38 @@ export default function AppointmentsCalendar({
           </div>
           <div className="flex items-center gap-1 border border-[#e6d5c3] rounded-lg p-0.5 bg-white">
             <button
-              onClick={view === "day" ? prevDay : prevWeek}
+              type="button"
+              onClick={() => {
+                if (view === "month") prevMonth();
+                else if (view === "day") prevDay();
+                else prevWeek();
+              }}
               className="p-1.5 hover:bg-cream-dark rounded-md text-earth-muted hover:text-earth transition"
-              title={view === "day" ? "Día anterior" : "Semana anterior"}
+              title={
+                view === "month"
+                  ? "Mes anterior"
+                  : view === "day"
+                    ? "Día anterior"
+                    : "Semana anterior"
+              }
             >
               <span className="material-symbols-outlined text-[18px]">chevron_left</span>
             </button>
             <button
-              onClick={view === "day" ? nextDay : nextWeek}
+              type="button"
+              onClick={() => {
+                if (view === "month") nextMonth();
+                else if (view === "day") nextDay();
+                else nextWeek();
+              }}
               className="p-1.5 hover:bg-cream-dark rounded-md text-earth-muted hover:text-earth transition"
-              title={view === "day" ? "Día siguiente" : "Semana siguiente"}
+              title={
+                view === "month"
+                  ? "Mes siguiente"
+                  : view === "day"
+                    ? "Día siguiente"
+                    : "Semana siguiente"
+              }
             >
               <span className="material-symbols-outlined text-[18px]">chevron_right</span>
             </button>
@@ -575,9 +662,13 @@ export default function AppointmentsCalendar({
           >
             {(settings && settings["calendar.today"]) ?? "Hoy"}
           </button>
-          <h2 className="text-sm font-bold text-earth hidden sm:block min-w-0 truncate max-w-[200px] md:max-w-none flex items-center gap-2">
-            {loadingWeek === viewWeekKey ? (
-              <span className="text-earth-muted font-normal">Cargando…</span>
+          <h2 className="flex max-w-[200px] min-w-0 items-center gap-2 truncate text-sm font-bold text-earth sm:max-w-none">
+            {view === "month" && loadingMonth === viewMonthKey ? (
+              <span className="font-normal text-earth-muted">Cargando…</span>
+            ) : view === "month" ? (
+              format(monthCursor, "MMMM yyyy", { locale: es })
+            ) : loadingWeek === viewWeekKey ? (
+              <span className="font-normal text-earth-muted">Cargando…</span>
             ) : view === "week" ? (
               `${format(weekStart, "d MMM", { locale: es })} – ${format(addDays(weekStart, 6), "d MMM yyyy", { locale: es })}`
             ) : (
@@ -657,7 +748,151 @@ export default function AppointmentsCalendar({
         </div>
       </div>
 
-      {/* ── Calendar grid ───────────────────────────────────────────────────── */}
+      {/* ── Vista mes (calendario mensual) ─────────────────────────────────── */}
+      {view === "month" && (
+        <div className="border-t border-[#e6d5c3] bg-[#FFFDF5] p-3 sm:p-4">
+          <div className="mx-auto max-w-5xl">
+            <div className="mb-2 grid grid-cols-7 gap-px rounded-t-lg border border-b-0 border-[#e6d5c3] bg-[#e6d5c3]">
+              {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((d) => (
+                <div
+                  key={d}
+                  className="bg-[#f5ebe0] py-2 text-center text-[10px] font-bold uppercase tracking-wider text-earth-muted"
+                >
+                  {d}
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-px rounded-b-lg border border-[#e6d5c3] bg-[#e6d5c3]">
+              {monthCalendarDays.map((day) => {
+                const isToday = isSameDay(day, new Date());
+                const inMonth = isSameMonth(day, monthCursor);
+                const dayAppts = filtered
+                  .filter((a) => isSameDay(new Date(a.startAt), day))
+                  .sort(
+                    (a, b) =>
+                      new Date(a.startAt).getTime() - new Date(b.startAt).getTime()
+                  );
+                return (
+                  <button
+                    key={day.toISOString()}
+                    type="button"
+                    onClick={() => {
+                      setSelectedDay(day);
+                      setWeekStart(startOfWeek(day, { weekStartsOn: 1 }));
+                      setView("day");
+                    }}
+                    className={cn(
+                      "min-h-[92px] w-full cursor-pointer bg-[#FFFDF5] p-1.5 text-left align-top transition hover:bg-cream-dark sm:min-h-[100px]",
+                      !inMonth && "opacity-45",
+                      isToday && "ring-2 ring-inset ring-primary/35"
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-1">
+                      <span
+                        className={cn(
+                          "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold",
+                          isToday ? "bg-primary-dark text-white" : "text-earth"
+                        )}
+                      >
+                        {format(day, "d")}
+                      </span>
+                      {dayAppts.length > 0 && (
+                        <div className="flex min-w-0 flex-1 flex-col items-stretch gap-1">
+                          {manicurists.map((m) => {
+                            const n = dayAppts.filter((a) => a.manicuristId === m.id).length;
+                            if (n === 0) return null;
+                            return (
+                              <div
+                                key={m.id}
+                                className="flex min-h-[2rem] min-w-0 overflow-hidden rounded-md bg-white/90 shadow-sm ring-1 ring-[#e6d5c3]/70"
+                                title={`${m.user.name}: ${n} ${(settings && settings["calendar.month.appts"]) ?? "citas"}`}
+                              >
+                                <div
+                                  className="w-1 shrink-0 self-stretch"
+                                  style={{ backgroundColor: m.color }}
+                                />
+                                <div className="flex min-w-0 flex-1 flex-col justify-center px-1 py-0.5">
+                                  <span className="line-clamp-2 text-[8px] font-bold leading-tight text-earth sm:text-[9px]">
+                                    {m.user.name}
+                                  </span>
+                                  <span className="text-[8px] font-semibold tabular-nums text-earth-muted sm:text-[9px]">
+                                    {n}{" "}
+                                    {(settings && settings["calendar.month.shortAppts"]) ?? "citas"}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-1 space-y-1">
+                      {dayAppts.slice(0, 3).map((a) => {
+                        const st = apptStyle[a.status] ?? apptStyle.PENDING;
+                        const maniColor = a.manicurist?.color ?? "#8D6E63";
+                        const maniName = a.manicurist?.user?.name ?? "—";
+                        return (
+                          <div
+                            key={a.id}
+                            role="button"
+                            tabIndex={0}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedAppointment(a);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setSelectedAppointment(a);
+                              }
+                            }}
+                            className={cn(
+                              "flex min-w-0 overflow-hidden rounded-md border text-left shadow-sm",
+                              st.bg,
+                              st.border
+                            )}
+                          >
+                            <div
+                              className="w-1 shrink-0 self-stretch"
+                              style={{ backgroundColor: maniColor }}
+                              aria-hidden
+                            />
+                            <div className="min-w-0 flex-1 px-1 py-1">
+                              <p
+                                className="truncate text-[9px] font-bold leading-tight sm:text-[10px]"
+                                style={{ color: maniColor }}
+                              >
+                                {maniName}
+                              </p>
+                              <p className={cn("truncate text-[10px] font-medium leading-tight", st.text)}>
+                                <span className="tabular-nums">
+                                  {format(new Date(a.startAt), "HH:mm")}
+                                </span>
+                                <span className="mx-0.5 text-earth-muted">·</span>
+                                {a.client.name}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {dayAppts.length > 3 && (
+                        <p className="text-[10px] font-medium text-earth-muted">
+                          +{dayAppts.length - 3}{" "}
+                          {(settings && settings["calendar.month.more"]) ?? "más"}
+                        </p>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Calendar grid (semana / día) ───────────────────────────────────── */}
+      {view !== "month" && (
       <div className="overflow-auto no-scrollbar">
         <div
           className={cn(view === "day" && "min-w-[320px]")}
@@ -866,6 +1101,7 @@ export default function AppointmentsCalendar({
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }
