@@ -1,0 +1,38 @@
+{
+  "name": "dates-saas",
+  "description": "SaaS de gestión de turnos para manicuristas",
+  "scripts": {
+    "postdeploy": "npx prisma migrate deploy"
+  },
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "basic"
+    },
+    "worker": {
+      "quantity": 1,
+      "size": "basic"
+    }
+  },
+  "env": {
+    "NODE_ENV": {
+      "value": "production"
+    },
+    "DATABASE_URL": {
+      "required": true
+    },
+    "AUTH_SECRET": {
+      "required": true,
+      "generator": "secret"
+    },
+    "NEXT_PUBLIC_APP_URL": {
+      "required": true,
+      "value": "https://dates-saas.herokuapp.com"
+    }
+  },
+  "buildpacks": [
+    {
+      "url": "heroku/nodejs"
+    }
+  ]
+}

@@ -16,9 +16,25 @@ export async function GET(req: NextRequest) {
   if (!session) return NextResponse.json(apiError("Unauthorized"), { status: 401 });
 
   const { searchParams } = req.nextUrl;
-  const manicuristId = searchParams.get("manicuristId");
+  let manicuristId = searchParams.get("manicuristId");
   const date = searchParams.get("date");
   const serviceId = searchParams.get("serviceId");
+
+  // Restricciones para manicuristas: solo ver su propia disponibilidad
+  if (session.user.role === "MANICURIST") {
+    const userManicuristId = session.user.manicuristId;
+    if (!userManicuristId) {
+      return NextResponse.json(apiError("No manicurist asociado", "AUTH"), { status: 403 });
+    }
+    // Si intentan ver disponibilidad de otra manicurista, forzar a ver solo la propia
+    if (manicuristId && manicuristId !== userManicuristId) {
+      return NextResponse.json(
+        apiError("Las manicuristas solo pueden ver su propia disponibilidad", "PERMISSION"),
+        { status: 403 }
+      );
+    }
+    manicuristId = userManicuristId;
+  }
 
   if (!manicuristId || !date || !serviceId) {
     return NextResponse.json(

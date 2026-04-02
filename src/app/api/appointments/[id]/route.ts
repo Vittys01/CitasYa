@@ -51,6 +51,18 @@ export async function GET(_req: NextRequest, { params }: Params) {
   });
 
   if (!appointment) return NextResponse.json(apiError("Not found"), { status: 404 });
+
+  // Restricciones para manicuristas: solo ver sus propias citas
+  if (session.user.role === "MANICURIST") {
+    const userManicuristId = session.user.manicuristId;
+    if (!userManicuristId || appointment.manicuristId !== userManicuristId) {
+      return NextResponse.json(
+        apiError("Solo puedes ver tus propias citas", "PERMISSION"),
+        { status: 403 }
+      );
+    }
+  }
+
   return NextResponse.json(apiSuccess(appointment));
 }
 
@@ -63,6 +75,40 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const parsed = updateSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(apiError(parsed.error.message, "VALIDATION"), { status: 422 });
+  }
+
+  // Restricciones para manicuristas
+  if (session.user.role === "MANICURIST") {
+    const userManicuristId = session.user.manicuristId;
+    if (!userManicuristId) {
+      return NextResponse.json(apiError("No manicurist asociado", "AUTH"), { status: 403 });
+    }
+
+    // Obtener la cita existente para verificar permisos
+    const existingAppointment = await prisma.appointment.findUnique({
+      where: { id },
+      select: { manicuristId: true },
+    });
+
+    if (!existingAppointment) {
+      return NextResponse.json(apiError("Cita no encontrada"), { status: 404 });
+    }
+
+    // Las manicuristas solo pueden modificar sus propias citas
+    if (existingAppointment.manicuristId !== userManicuristId) {
+      return NextResponse.json(
+        apiError("Solo puedes modificar tus propias citas", "PERMISSION"),
+        { status: 403 }
+      );
+    }
+
+    // Las manicuristas no pueden cambiar el manicuristId de la cita
+    if (parsed.data.manicuristId && parsed.data.manicuristId !== userManicuristId) {
+      return NextResponse.json(
+        apiError("No puedes cambiar la profesional de la cita", "PERMISSION"),
+        { status: 403 }
+      );
+    }
   }
 
   try {
@@ -81,6 +127,33 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   if (!session) return NextResponse.json(apiError("Unauthorized"), { status: 401 });
 
   const { id } = await params;
+
+  // Restricciones para manicuristas
+  if (session.user.role === "MANICURIST") {
+    const userManicuristId = session.user.manicuristId;
+    if (!userManicuristId) {
+      return NextResponse.json(apiError("No manicurist asociado", "AUTH"), { status: 403 });
+    }
+
+    // Obtener la cita para verificar permisos
+    const existingAppointment = await prisma.appointment.findUnique({
+      where: { id },
+      select: { manicuristId: true },
+    });
+
+    if (!existingAppointment) {
+      return NextResponse.json(apiError("Cita no encontrada"), { status: 404 });
+    }
+
+    // Las manicuristas solo pueden cancelar sus propias citas
+    if (existingAppointment.manicuristId !== userManicuristId) {
+      return NextResponse.json(
+        apiError("Solo puedes cancelar tus propias citas", "PERMISSION"),
+        { status: 403 }
+      );
+    }
+  }
+
   try {
     await cancelAppointment(id);
     return NextResponse.json(apiSuccess({ cancelled: true }));

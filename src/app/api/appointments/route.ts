@@ -47,7 +47,24 @@ export async function GET(req: NextRequest) {
   const weekStart = searchParams.get("weekStart");
   /** Primer día del mes en ISO (ej. 2025-03-01) para vista mes */
   const month = searchParams.get("month");
-  const manicuristId = searchParams.get("manicuristId") ?? undefined;
+  let manicuristId = searchParams.get("manicuristId") ?? undefined;
+
+  // Restricciones para manicuristas: solo ver sus propias citas
+  if (session.user.role === "MANICURIST") {
+    const userManicuristId = session.user.manicuristId;
+    if (!userManicuristId) {
+      return NextResponse.json(apiError("No manicurist asociado", "AUTH"), { status: 403 });
+    }
+    // Si intentan ver citas de otra manicurista, forzar a ver solo las propias
+    if (manicuristId && manicuristId !== userManicuristId) {
+      return NextResponse.json(
+        apiError("Las manicuristas solo pueden ver sus propias citas", "PERMISSION"),
+        { status: 403 }
+      );
+    }
+    manicuristId = userManicuristId;
+  }
+
   const options = { businessId, manicuristId };
 
   try {
@@ -76,6 +93,20 @@ export async function POST(req: NextRequest) {
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(apiError(parsed.error.message, "VALIDATION"), { status: 422 });
+  }
+
+  // Restricción para manicuristas: solo pueden crear citas para sí mismas
+  if (session.user.role === "MANICURIST") {
+    const userManicuristId = session.user.manicuristId;
+    if (!userManicuristId) {
+      return NextResponse.json(apiError("No manicurist asociado", "AUTH"), { status: 403 });
+    }
+    if (parsed.data.manicuristId !== userManicuristId) {
+      return NextResponse.json(
+        apiError("Las manicuristas solo pueden crear citas para sí mismas", "PERMISSION"),
+        { status: 403 }
+      );
+    }
   }
 
   try {

@@ -22,9 +22,13 @@ export async function GET(req: NextRequest) {
   const from = new Date(searchParams.get("from") ?? defaultFrom.toISOString());
   const to = new Date(searchParams.get("to") ?? now.toISOString());
 
+  // Restricciones para manicuristas: solo ver sus propias estadísticas
+  const isManicurist = session.user.role === "MANICURIST";
+  const manicuristId = isManicurist ? session.user.manicuristId : undefined;
+
   const [stats, productivity] = await Promise.all([
-    getDashboardStats(from, to),
-    getManicuristProductivity(from, to),
+    getDashboardStats(from, to, { manicuristId }),
+    isManicurist ? Promise.resolve([]) : getManicuristProductivity(from, to),
   ]);
 
   return NextResponse.json(apiSuccess({ stats, productivity }));

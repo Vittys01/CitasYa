@@ -20,9 +20,25 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = req.nextUrl;
     const serviceId = searchParams.get("serviceId");
-    const manicuristId = searchParams.get("manicuristId");
+    let manicuristId = searchParams.get("manicuristId");
     const limitParam = searchParams.get("limit") ?? "3";
     const limit = Math.min(20, Math.max(1, parseInt(limitParam, 10) || 3));
+
+    // Restricciones para manicuristas: solo ver su propia disponibilidad
+    if (session.user.role === "MANICURIST") {
+      const userManicuristId = session.user.manicuristId;
+      if (!userManicuristId) {
+        return NextResponse.json(apiError("No manicurist asociado", "AUTH"), { status: 403 });
+      }
+      // Si intentan ver disponibilidad de otra manicurista, forzar a ver solo la propia
+      if (manicuristId && manicuristId !== userManicuristId) {
+        return NextResponse.json(
+          apiError("Las manicuristas solo pueden ver su propia disponibilidad", "PERMISSION"),
+          { status: 403 }
+        );
+      }
+      manicuristId = userManicuristId;
+    }
 
     if (!serviceId) {
       return NextResponse.json(apiError("serviceId es requerido"), { status: 422 });

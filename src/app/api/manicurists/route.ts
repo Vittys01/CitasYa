@@ -34,8 +34,18 @@ export async function GET(_req: NextRequest) {
   const businessId = session.user.businessId;
   if (!businessId) return NextResponse.json(apiError("No business context"), { status: 403 });
 
+  // Restricciones para manicuristas: solo verse a sí mismas
+  let whereClause: any = { businessId, isActive: true };
+  if (session.user.role === "MANICURIST") {
+    const userManicuristId = session.user.manicuristId;
+    if (!userManicuristId) {
+      return NextResponse.json(apiError("No manicurist asociado", "AUTH"), { status: 403 });
+    }
+    whereClause.id = userManicuristId;
+  }
+
   const manicurists = await prisma.manicurist.findMany({
-    where: { businessId, isActive: true },
+    where: whereClause,
     include: {
       user: { select: { id: true, name: true, email: true, avatarUrl: true } },
       schedules: true,
