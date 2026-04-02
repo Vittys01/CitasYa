@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
 
   // Restricciones para manicuristas: solo ver sus propias estadísticas
   const isManicurist = session.user.role === "MANICURIST";
-  const manicuristId = isManicurist ? session.user.manicuristId : undefined;
+  const manicuristId = isManicurist ? (session.user.manicuristId ?? undefined) : undefined;
 
   const [stats, productivity] = await Promise.all([
     getDashboardStats(from, to, { manicuristId }),
