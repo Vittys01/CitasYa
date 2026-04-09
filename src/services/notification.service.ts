@@ -170,6 +170,16 @@ export async function processNotification(
     },
   });
 
+  // Logging adicional para ver el resultado completo
+  console.log('[Notification] Resultado del envío:', {
+    type,
+    appointmentId,
+    clientPhone: client.phone,
+    success: result.success,
+    externalId: result.externalId,
+    error: result.error
+  });
+
   if (!result.success) {
     console.error(
       `[Notification] ❌ ${type} falló para cita ${appointmentId} (${client.phone}): ${result.error}`

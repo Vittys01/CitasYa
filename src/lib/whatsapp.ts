@@ -315,6 +315,17 @@ export class TwilioProvider implements WhatsAppProvider {
         To: toWhatsApp,
         ContentSid: contentSid,
         ContentVariables: JSON.stringify(msg.variables),
+        ContentLanguage: "es", // Necesario para plantillas en español (código ISO 639-1)
+      });
+
+      // Logging detallado antes del envío
+      console.log('[Twilio] Enviando plantilla:', {
+        contentSid,
+        fromNumber: this.fromNumber,
+        to: toWhatsApp,
+        contentLanguage: 'es',
+        variables: msg.variables,
+        formBody: form.toString()
       });
 
       const res = await fetch(url, {
@@ -326,8 +337,23 @@ export class TwilioProvider implements WhatsAppProvider {
         body: form.toString(),
       });
 
-      const data = (await res.json()) as { sid?: string; message?: string; code?: number };
+      const data = (await res.json()) as {
+        sid?: string;
+        message?: string;
+        code?: number;
+        error_code?: number;
+        status?: string;
+        error_message?: string;
+      };
 
+      // Logging detallado de la respuesta
+      console.log('[Twilio] Respuesta recibida:', {
+        httpStatus: res.status,
+        httpOk: res.ok,
+        responseData: data
+      });
+
+      // Verificar errores HTTP y errores en el cuerpo de la respuesta
       if (!res.ok) {
         return {
           success: false,
@@ -335,8 +361,25 @@ export class TwilioProvider implements WhatsAppProvider {
         };
       }
 
+      // Verificar errores en el cuerpo de la respuesta (Twilio puede devolver 200 con errores)
+      if (data.error_code || data.code) {
+        return {
+          success: false,
+          error: `Twilio API error: ${data.error_code || data.code} - ${data.message || data.error_message || 'Unknown error'}`,
+        };
+      }
+
+      // Verificar que el status del mensaje no sea 'failed' o 'undelivered'
+      if (data.status === 'failed' || data.status === 'undelivered') {
+        return {
+          success: false,
+          error: `Message status: ${data.status} - ${data.message || 'Unknown error'}`,
+        };
+      }
+
       return { success: true, externalId: data?.sid };
     } catch (err) {
+      console.error('[Twilio] Error en sendContentTemplate:', err);
       return { success: false, error: String(err) };
     }
   }
@@ -429,13 +472,28 @@ const DEFAULT_CANCELLATION =
   "❌ *Turno cancelado*\n\nHola {clientName}. Tu turno del {date} a las {time} para *{serviceName}* ha sido cancelado.\n\nSi querés reagendar, escribinos cuando quieras. 🌸";
 
 function formatDateLong(d: Date): string {
-  return d.toLocaleDateString("es-AR", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+  return d.toLocaleDateString("es-ES", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    timeZone: "Atlantic/Canary"
+  });
 }
 function formatDateShort(d: Date): string {
-  return d.toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" });
+  return d.toLocaleDateString("es-ES", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    timeZone: "Atlantic/Canary"
+  });
 }
 function formatTime(d: Date): string {
-  return d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleTimeString("es-ES", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Atlantic/Canary"
+  });
 }
 
 export function buildConfirmationMessage(
@@ -510,7 +568,7 @@ export function buildConfirmationTwilioContentVariables(params: {
   return {
     "1": params.clientName,
     "2": `${date}, ${time} — ${params.serviceName}`,
-    "3": params.manicuristName,
+    "3": params.manicuristName, // Twilio requiere variables consecutivas
   };
 }
 
