@@ -71,7 +71,10 @@ function linePriceAmount(item: SelectedService, svc: ServiceForClient | undefine
     const v = parseFloat(raw.replace(",", "."));
     return Number.isNaN(v) ? Number(svc?.price ?? 0) : Math.max(0, v);
   }
-  return item.price ?? Number(svc?.price ?? 0);
+  // Asegurar que siempre devolvemos un número
+  const itemPrice = typeof item.price === 'string' ? parseFloat(item.price) : item.price;
+  const fallbackPrice = Number(svc?.price ?? 0);
+  return Number.isNaN(itemPrice) ? fallbackPrice : Math.max(0, itemPrice);
 }
 
 const schema = z.object({

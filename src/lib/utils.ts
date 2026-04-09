@@ -152,3 +152,47 @@ export function apiError(message: string, code?: string, status = 400) {
 export function canAccessStaffFeatures(role: string): boolean {
   return ["ADMIN", "OWNER", "RECEPTIONIST"].includes(role);
 }
+
+/** Format phone number for display (e.g. +5491112345678 → +54 9 11 1234-5678) */
+export function formatPhoneNumber(phoneE164: string): string {
+  if (!phoneE164) return "";
+
+  const digits = phoneE164.replace(/\D/g, "");
+
+  if (digits.length === 13 && digits.startsWith("549")) {
+    // Argentina: +54 9 11 1234-5678
+    return `+54 9 ${digits.slice(4, 6)} ${digits.slice(6, 10)}-${digits.slice(10)}`;
+  }
+
+  if (digits.length === 11 && digits.startsWith("5411")) {
+    // Argentina (sin 9): +54 11 1234-5678
+    return `+54 ${digits.slice(2, 4)} ${digits.slice(4, 8)}-${digits.slice(8)}`;
+  }
+
+  // Default: just format with spaces every 3-4 digits
+  if (digits.length > 6) {
+    return `+${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`;
+  }
+
+  return phoneE164;
+}
+
+/** Format relative time (e.g. "hace 5 min", "ayer") */
+export function formatRelativeTime(date: Date): string {
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return "ahora";
+  if (diffMins < 60) return `hace ${diffMins} min`;
+  if (diffHours < 24) return `hace ${diffHours} h`;
+  if (diffDays === 1) return "ayer";
+  if (diffDays < 7) return `hace ${diffDays} días`;
+
+  return date.toLocaleDateString("es-ES", {
+    day: "2-digit",
+    month: "2-digit",
+  });
+}

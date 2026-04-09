@@ -39,6 +39,18 @@ enum NotificationStatus {
   FAILED
 }
 
+enum Direction {
+  INBOUND
+  OUTBOUND
+}
+
+enum MessageStatus {
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
 // ─── Businesses (multi-tenant) ─────────────────────────────────────────────────
 
 model Business {
@@ -70,6 +82,7 @@ model Business {
   appSettings   AppSetting[]
   appointments  Appointment[]
   whatsappBotSessions WhatsAppBotSession[]
+  whatsappMessages WhatsAppMessage[]
 
   @@index([ownerId])
   @@index([slug])
@@ -281,6 +294,27 @@ model AppSetting {
 
   @@unique([businessId, key])
   @@index([businessId])
+}
+
+// ─── WhatsApp Chat ─────────────────────────────────────────────────────────────
+
+model WhatsAppMessage {
+  id          String       @id @default(cuid())
+  businessId  String
+  business    Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  phoneE164   String       // E.164
+  direction   Direction    // INBOUND | OUTBOUND
+  content     String       // Contenido del mensaje
+  status      MessageStatus @default(SENT) // SENT, DELIVERED, READ, FAILED
+  externalId  String?      // ID del mensaje en WhatsApp API
+
+  metadata    Json?        // Datos adicionales (media, timestamp del proveedor, etc.)
+  createdAt   DateTime     @default(now())
+
+  @@index([businessId])
+  @@index([phoneE164])
+  @@index([createdAt])
 }
 
 // ─── Notifications ────────────────────────────────────────────────────────────

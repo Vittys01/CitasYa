@@ -6,6 +6,7 @@ export const STAFF_ROLES = ["ADMIN", "OWNER", "RECEPTIONIST"] as const;
 export const navKeys = [
   { href: "/dashboard",    key: "Dashboard",    icon: "dashboard",       staffOnly: false, ownerOnly: false, labelEs: "Panel" },
   { href: "/appointments", key: "Appointments", icon: "calendar_month",  staffOnly: false, ownerOnly: false, labelEs: "Turnos" },
+  { href: "/whatsapp",     key: "WhatsApp",     icon: "chat",            staffOnly: true,  ownerOnly: false, labelEs: "Chat WhatsApp" },
   { href: "/clients",      key: "Clients",      icon: "group",           staffOnly: true,  ownerOnly: false, labelEs: "Clientes" },
   { href: "/servicios",    key: "Servicios",    icon: "spa",             staffOnly: true,  ownerOnly: false, labelEs: "Servicios" },
   { href: "/equipo",       key: "Equipo",       icon: "badge",           staffOnly: true,  ownerOnly: false, labelEs: "Equipo" },
