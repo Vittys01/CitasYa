@@ -79,6 +79,7 @@ const schema = z.object({
   manicuristId: z.string().min(1),
   startAt:      z.string().min(1),
   notes:        z.string().optional(),
+  status:       z.enum(["PENDING", "CONFIRMED", "COMPLETED"]).optional(),
 }).refine((d) => d.clientId && d.manicuristId && d.startAt, { message: "Completá todos los campos" });
 
 type FormData = z.infer<typeof schema>;
@@ -382,6 +383,7 @@ export default function NewAppointmentButton({
     setValue("clientId", a.clientId, { shouldValidate: true });
     setValue("manicuristId", a.manicuristId, { shouldValidate: true });
     setValue("notes", a.notes ?? "", { shouldValidate: false });
+    setValue("status", a.status, { shouldValidate: false });
     const d = new Date(a.startAt as string);
     setPickerDate(format(d, "yyyy-MM-dd"));
     setManicuristFilter(lockedManicuristId ?? a.manicuristId);
@@ -446,6 +448,7 @@ export default function NewAppointmentButton({
         price: priceForSubmit,
         totalDurationMinutes: effectiveSlotDuration,
         sendWhatsApp,
+        ...(editingAppointment?.id && data.status ? { status: data.status } : {}),
       };
 
       const url = editingAppointment?.id
@@ -1014,6 +1017,21 @@ export default function NewAppointmentButton({
                   </div>
                 </div>
               </div>
+
+              {/* Status - solo en modo edición */}
+              {editingAppointment && (
+                <div className="border-t border-[#f0ede8] pt-5">
+                  <label className={labelCls}>Estado</label>
+                  <select
+                    {...register("status")}
+                    className={inputCls}
+                  >
+                    <option value="PENDING">Pendiente</option>
+                    <option value="CONFIRMED">Confirmada</option>
+                    <option value="COMPLETED">Realizada</option>
+                  </select>
+                </div>
+              )}
 
               {/* Notes */}
               <div className="border-t border-[#f0ede8] pt-5">
