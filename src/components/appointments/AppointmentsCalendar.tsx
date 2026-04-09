@@ -18,7 +18,7 @@ import {
   setMinutes,
 } from "date-fns";
 import { es } from "date-fns/locale";
-import { cn, SCHEDULE_SLOT_MINUTES } from "@/lib/utils";
+import { cn, SCHEDULE_SLOT_MINUTES, formatDateShort, formatHour, toCanaryTimezone } from "@/lib/utils";
 import { formatPrice } from "@/lib/format-price";
 import type { Manicurist, Client, Schedule } from "@prisma/client";
 import type { ServiceForClient, AppointmentForClient } from "@/lib/serialize";
@@ -492,10 +492,10 @@ export default function AppointmentsCalendar({
                     {(settings && settings["form.section.schedule"]) ?? "Horario"}
                   </p>
                   <p className="text-sm text-earth">
-                    {format(new Date(selectedAppointment.startAt), "EEEE d 'de' MMMM", { locale: es })}
+                    {formatDateShort(new Date(selectedAppointment.startAt))}
                   </p>
                   <p className="text-sm font-semibold text-earth mt-0.5">
-                    {format(new Date(selectedAppointment.startAt), "HH:mm")} – {format(new Date(selectedAppointment.endAt), "HH:mm")}
+                    {formatHour(new Date(selectedAppointment.startAt))} – {formatHour(new Date(selectedAppointment.endAt))}
                   </p>
                 </div>
                 <div className="flex items-center justify-between">
@@ -666,13 +666,13 @@ export default function AppointmentsCalendar({
             {view === "month" && loadingMonth === viewMonthKey ? (
               <span className="font-normal text-earth-muted">Cargando…</span>
             ) : view === "month" ? (
-              format(monthCursor, "MMMM yyyy", { locale: es })
+              format(toCanaryTimezone(monthCursor), "MMMM yyyy", { locale: es })
             ) : loadingWeek === viewWeekKey ? (
               <span className="font-normal text-earth-muted">Cargando…</span>
             ) : view === "week" ? (
-              `${format(weekStart, "d MMM", { locale: es })} – ${format(addDays(weekStart, 6), "d MMM yyyy", { locale: es })}`
+              `${format(toCanaryTimezone(weekStart), "d MMM", { locale: es })} – ${format(toCanaryTimezone(addDays(weekStart, 6)), "d MMM yyyy", { locale: es })}`
             ) : (
-              format(selectedDay, "EEEE d MMM yyyy", { locale: es })
+              format(toCanaryTimezone(selectedDay), "EEEE d MMM yyyy", { locale: es })
             )}
           </h2>
         </div>
@@ -867,7 +867,7 @@ export default function AppointmentsCalendar({
                               </p>
                               <p className={cn("truncate text-[10px] font-medium leading-tight", st.text)}>
                                 <span className="tabular-nums">
-                                  {format(new Date(a.startAt), "HH:mm")}
+                                  {formatHour(new Date(a.startAt))}
                                 </span>
                                 <span className="mx-0.5 text-earth-muted">·</span>
                                 {a.client.name}
@@ -933,7 +933,7 @@ export default function AppointmentsCalendar({
                     )}
                   >
                     <p className="text-[10px] font-semibold uppercase text-earth-muted">
-                      {format(day, "EEE", { locale: es })}
+                      {format(toCanaryTimezone(day), "EEE", { locale: es })}
                     </p>
                     <div
                       className={cn(

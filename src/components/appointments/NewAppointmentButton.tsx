@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { ceilToNextSlotMinute, cn } from "@/lib/utils";
+import { ceilToNextSlotMinute, cn, formatDateShort, formatHour } from "@/lib/utils";
 import { formatPrice } from "@/lib/format-price";
 import type { Manicurist, Client, Schedule } from "@prisma/client";
 import { appointmentFromApiJson, type ServiceForClient, type AppointmentForClient } from "@/lib/serialize";
@@ -294,8 +294,8 @@ export default function NewAppointmentButton({
   // ── Helpers ─────────────────────────────────────────────────────────────────
   function formatSlot(s: SlotOption) {
     const d = new Date(s.start);
-    const dateStr = d.toLocaleDateString("es-AR", { weekday: "short", day: "2-digit", month: "2-digit" });
-    const timeStr = d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+    const dateStr = d.toLocaleDateString("es-ES", { weekday: "short", day: "2-digit", month: "2-digit", timeZone: "Atlantic/Canary" });
+    const timeStr = formatHour(d);
     return `${dateStr} ${timeStr} — ${s.manicuristName}`;
   }
 

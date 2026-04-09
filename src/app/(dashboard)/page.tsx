@@ -3,6 +3,7 @@ import { getDashboardStats, getManicuristProductivity } from "@/services/dashboa
 import { getAppointmentsByDate } from "@/services/appointment.service";
 import { getAppSettings } from "@/services/settings.service";
 import { serializeAppointmentPrice } from "@/lib/serialize";
+import { formatDate } from "@/lib/utils";
 import StatsCards from "@/components/dashboard/StatsCards";
 import ProductivityChart from "@/components/dashboard/ProductivityChart";
 import TodayAppointments from "@/components/dashboard/TodayAppointments";
@@ -32,7 +33,7 @@ export default async function DashboardPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">{settings["nav.dashboard"] ?? "Dashboard"}</h1>
         <p className="text-gray-500 text-sm mt-1">
-          {settings["dashboard.welcome"] ?? "Bienvenida"}, {session?.user.name} · {now.toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" })}
+          {settings["dashboard.welcome"] ?? "Bienvenida"}, {session?.user.name} · {formatDate(now)}
         </p>
       </div>
 

@@ -15,6 +15,7 @@ import {
   ceilToNextSlotMinute,
   intervalsOverlap,
   SCHEDULE_SLOT_MINUTES,
+  toCanaryTimezone,
 } from "@/lib/utils";
 import {
   enqueueConfirmation,
@@ -171,7 +172,7 @@ export async function createAppointment(
     endAt
   );
   if (existing) {
-    const range = `${format(existing.startAt, "d/M HH:mm", { locale: es })} – ${format(existing.endAt, "HH:mm", { locale: es })}`;
+    const range = `${format(toCanaryTimezone(existing.startAt), "d/M HH:mm", { locale: es })} – ${format(toCanaryTimezone(existing.endAt), "HH:mm", { locale: es })}`;
     throw new Error(`El cliente ya tiene un turno en ese horario (${range}). Elegí otro horario o revisá el calendario.`);
   }
 
@@ -260,7 +261,7 @@ export async function updateAppointment(
 
     const other = await getClientOverlappingAppointment(clientId, startAt, endAt, id);
     if (other) {
-      const range = `${format(other.startAt, "d/M HH:mm", { locale: es })} – ${format(other.endAt, "HH:mm", { locale: es })}`;
+      const range = `${format(toCanaryTimezone(other.startAt), "d/M HH:mm", { locale: es })} – ${format(toCanaryTimezone(other.endAt), "HH:mm", { locale: es })}`;
       throw new Error(`El cliente ya tiene un turno en ese horario (${range}). Elegí otro horario o revisá el calendario.`);
     }
 
@@ -335,7 +336,7 @@ export async function updateAppointment(
     const overlapClientId = input.clientId ?? existing.clientId;
     const other = await getClientOverlappingAppointment(overlapClientId, startAt, endAt, id);
     if (other) {
-      const range = `${format(other.startAt, "d/M HH:mm", { locale: es })} – ${format(other.endAt, "HH:mm", { locale: es })}`;
+      const range = `${format(toCanaryTimezone(other.startAt), "d/M HH:mm", { locale: es })} – ${format(toCanaryTimezone(other.endAt), "HH:mm", { locale: es })}`;
       throw new Error(`El cliente ya tiene un turno en ese horario (${range}). Elegí otro horario o revisá el calendario.`);
     }
   }

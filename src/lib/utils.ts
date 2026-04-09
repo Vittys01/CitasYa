@@ -15,16 +15,61 @@ export function formatCurrency(amount: number | string): string {
 }
 
 export function formatTime(date: Date): string {
-  return date.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+  return date.toLocaleTimeString("es-ES", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Atlantic/Canary"
+  });
 }
 
 export function formatDate(date: Date): string {
-  return date.toLocaleDateString("es-AR", {
+  return date.toLocaleDateString("es-ES", {
     weekday: "long",
     year: "numeric",
     month: "long",
     day: "numeric",
+    timeZone: "Atlantic/Canary"
   });
+}
+
+/** Formato de fecha corta para calendarios (ej: "lunes 15 de abril") */
+export function formatDateShort(date: Date): string {
+  return date.toLocaleDateString("es-ES", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    timeZone: "Atlantic/Canary"
+  });
+}
+
+/** Formato de hora (24h) para calendarios */
+export function formatHour(date: Date): string {
+  return date.toLocaleTimeString("es-ES", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Atlantic/Canary"
+  });
+}
+
+/** Formato de mes y año (ej: "abril de 2026") */
+export function formatMonthYear(date: Date): string {
+  return date.toLocaleDateString("es-ES", {
+    month: "long",
+    year: "numeric",
+    timeZone: "Atlantic/Canary"
+  });
+}
+
+/**
+ * Convierte una fecha UTC a la zona horaria de Canarias para usar con date-fns
+ * date-fns no soporta timezones nativamente, por lo que convertimos la fecha
+ * ajustando la diferencia horaria
+ */
+export function toCanaryTimezone(date: Date): Date {
+  // Obtenemos la fecha/hora en la zona horaria de Canarias
+  const canaryTimeStr = date.toLocaleString("en-US", { timeZone: "Atlantic/Canary" });
+  return new Date(canaryTimeStr);
 }
 
 /** Paso de la grilla de turnos (API, lista de horarios, “desde ahora”). */

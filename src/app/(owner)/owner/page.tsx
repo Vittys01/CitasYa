@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import Link from "next/link";
 import DeleteBusinessButton from "@/components/owner/DeleteBusinessButton";
 import { CURRENCIES } from "@/lib/format-price";
+import { formatMonthYear } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -71,7 +72,7 @@ export default async function OwnerPage() {
     allSettings.map((s) => [s.businessId, s.value])
   );
 
-  const currentMonthLabel = now.toLocaleDateString("es-AR", { month: "long", year: "numeric" });
+  const currentMonthLabel = formatMonthYear(now);
 
   return (
     <div>

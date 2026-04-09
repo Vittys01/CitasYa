@@ -5,6 +5,7 @@ import Link from "next/link";
 import DeleteBusinessButton from "@/components/owner/DeleteBusinessButton";
 import { CURRENCIES } from "@/lib/format-price";
 import { getAppSettings } from "@/services/settings.service";
+import { formatMonthYear, formatDate } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -81,7 +82,7 @@ export default async function BusinessDetailPage({
 
   const totalRevenue = Number(totalRev._sum.price ?? 0);
   const monthRevenue = Number(monthRev._sum.price ?? 0);
-  const currentMonthLabel = now.toLocaleDateString("es-AR", { month: "long", year: "numeric" });
+  const currentMonthLabel = formatMonthYear(now);
   const currencyCode = settings["app.currency"] ?? "ARS";
   const currencyCfg = CURRENCIES[currencyCode] ?? CURRENCIES["ARS"];
 
@@ -123,11 +124,7 @@ export default async function BusinessDetailPage({
               </div>
               <p className="text-xs text-[#bda696] mt-1">
                 Creada el{" "}
-                {new Date(business.createdAt).toLocaleDateString("es-AR", {
-                  day: "numeric",
-                  month: "long",
-                  year: "numeric",
-                })}
+                {formatDate(new Date(business.createdAt))}
               </p>
             </div>
           </div>
@@ -271,7 +268,7 @@ export default async function BusinessDetailPage({
                       </span>
                     </td>
                     <td className="px-6 py-3.5 text-[#9c8273] text-xs">
-                      {new Date(member.createdAt).toLocaleDateString("es-AR")}
+                      {formatDate(new Date(member.createdAt))}
                     </td>
                   </tr>
                 ))}
