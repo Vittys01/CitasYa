@@ -72,9 +72,11 @@ function linePriceAmount(item: SelectedService, svc: ServiceForClient | undefine
     return Number.isNaN(v) ? Number(svc?.price ?? 0) : Math.max(0, v);
   }
   // Asegurar que siempre devolvemos un número
-  const itemPrice = typeof item.price === 'string' ? parseFloat(item.price) : item.price;
+  const itemPrice = item.price !== undefined
+    ? (typeof item.price === 'string' ? parseFloat(item.price) : item.price)
+    : undefined;
   const fallbackPrice = Number(svc?.price ?? 0);
-  return Number.isNaN(itemPrice) ? fallbackPrice : Math.max(0, itemPrice);
+  return Number.isNaN(itemPrice) || itemPrice === undefined ? fallbackPrice : Math.max(0, itemPrice);
 }
 
 const schema = z.object({
