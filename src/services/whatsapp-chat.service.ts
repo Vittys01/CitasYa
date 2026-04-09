@@ -303,7 +303,7 @@ export async function getContactInfo(
 
   return {
     name: client.name,
-    email: client.email,
+    email: client.email ?? undefined,
     avatar: client.email
       ? `https://www.gravatar.com/avatar/${Buffer.from(client.email.trim().toLowerCase()).toString("hex")}?d=retro`
       : undefined,
