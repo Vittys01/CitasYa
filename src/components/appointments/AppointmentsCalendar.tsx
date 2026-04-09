@@ -84,12 +84,17 @@ function formatHourLabel(h: number): string {
 }
 
 function topPx(date: Date): number {
-  const minutes = (date.getHours() - GRID_START_HOUR) * 60 + date.getMinutes();
+  // Convertir a zona horaria de Canarias antes de obtener la hora
+  const canaryDate = toCanaryTimezone(date);
+  const minutes = (canaryDate.getHours() - GRID_START_HOUR) * 60 + canaryDate.getMinutes();
   return (minutes / 60) * PX_PER_HOUR;
 }
 
 function heightPx(start: Date, end: Date): number {
-  const mins = Math.max(differenceInMinutes(end, start), 30);
+  // Convertir ambas fechas a Canarias antes de calcular la duración
+  const canaryStart = toCanaryTimezone(start);
+  const canaryEnd = toCanaryTimezone(end);
+  const mins = Math.max(differenceInMinutes(canaryEnd, canaryStart), 30);
   return (mins / 60) * PX_PER_HOUR;
 }
 
@@ -343,7 +348,7 @@ export default function AppointmentsCalendar({
   );
 
   const days = useMemo(
-    () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
+    () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)).map(d => toCanaryTimezone(d)),
     [weekStart]
   );
 
@@ -386,7 +391,7 @@ export default function AppointmentsCalendar({
     return eachDayOfInterval({ start: gridStart, end: gridEnd });
   }, [monthCursor]);
 
-  const viewDays = view === "week" ? days : [selectedDay];
+  const viewDays = view === "week" ? days : [toCanaryTimezone(selectedDay)];
 
   /** En vista día: manicuristas a mostrar como columnas (según filtro) */
   const dayViewManicurists = useMemo(
@@ -395,11 +400,15 @@ export default function AppointmentsCalendar({
   );
 
   function getApptForDay(day: Date) {
-    return filtered.filter((a) => isSameDay(new Date(a.startAt), day));
+    return filtered.filter((a) => isSameDay(toCanaryTimezone(new Date(a.startAt)), day));
   }
 
   function getApptForDayAndManicurist(day: Date, manicuristId: string) {
-    return getApptForDay(day).filter((a) => a.manicuristId === manicuristId);
+    const canaryDay = toCanaryTimezone(day);
+    return filtered.filter((a) =>
+      isSameDay(toCanaryTimezone(new Date(a.startAt)), canaryDay) &&
+      a.manicuristId === manicuristId
+    );
   }
 
   const hours = Array.from({ length: GRID_HOURS }, (_, i) => GRID_START_HOUR + i);
@@ -767,7 +776,7 @@ export default function AppointmentsCalendar({
                 const isToday = isSameDay(day, new Date());
                 const inMonth = isSameMonth(day, monthCursor);
                 const dayAppts = filtered
-                  .filter((a) => isSameDay(new Date(a.startAt), day))
+                  .filter((a) => isSameDay(toCanaryTimezone(new Date(a.startAt)), day))
                   .sort(
                     (a, b) =>
                       new Date(a.startAt).getTime() - new Date(b.startAt).getTime()
@@ -1118,7 +1127,7 @@ function slotFromOffsetY(offsetY: number, slotDay: Date): Date {
   );
   const h = Math.floor(rounded / 60);
   const m = rounded % 60;
-  const start = new Date(slotDay);
+  const start = toCanaryTimezone(new Date(slotDay));
   start.setHours(h, m, 0, 0);
   return start;
 }
