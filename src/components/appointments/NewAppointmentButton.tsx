@@ -79,7 +79,7 @@ const schema = z.object({
   manicuristId: z.string().min(1),
   startAt:      z.string().min(1),
   notes:        z.string().optional(),
-  status:       z.enum(["PENDING", "CONFIRMED", "COMPLETED"]).optional(),
+  status:       z.enum(["PENDING", "CONFIRMED", "COMPLETED", "CANCELLED"]).optional(),
 }).refine((d) => d.clientId && d.manicuristId && d.startAt, { message: "Completá todos los campos" });
 
 type FormData = z.infer<typeof schema>;
@@ -1029,6 +1029,7 @@ export default function NewAppointmentButton({
                     <option value="PENDING">Pendiente</option>
                     <option value="CONFIRMED">Confirmada</option>
                     <option value="COMPLETED">Realizada</option>
+                    <option value="CANCELLED">Cancelada</option>
                   </select>
                 </div>
               )}
