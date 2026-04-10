@@ -42,16 +42,16 @@ export async function POST(req: NextRequest) {
     // Extract E.164 phone number from Twilio format
     const phoneE164 = from.replace("whatsapp:", "").trim();
 
-    // Find business by Twilio Account SID
+    // Find business by Twilio WhatsApp number (To field)
     const business = await prisma.business.findFirst({
       where: {
-        twilioAccountSid: accountSid,
+        twilioWhatsAppNumber: toRaw,
         isActive: true,
       },
     });
 
     if (!business) {
-      console.log("[Twilio Webhook] Business not found for account SID:", accountSid);
+      console.log("[Twilio Webhook] Business not found for WhatsApp number:", toRaw);
       return new NextResponse(null, { status: 200 });
     }
 

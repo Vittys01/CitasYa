@@ -26,6 +26,14 @@ const updateSchema = z.object({
     .regex(/^[a-z0-9-]+$/, "Solo letras minúsculas, números y guiones")
     .optional(),
   isActive: z.boolean().optional(),
+  // WhatsApp (Meta Cloud API)
+  whatsappProvider: z.enum(["meta", "twilio"]).optional(),
+  metaPhoneNumberId: z.string().optional(),
+  metaAccessToken: z.string().optional(),
+  // WhatsApp (Twilio)
+  twilioAccountSid: z.string().optional(),
+  twilioAuthToken: z.string().optional(),
+  twilioWhatsAppNumber: z.string().optional(),
 });
 
 export async function GET(
