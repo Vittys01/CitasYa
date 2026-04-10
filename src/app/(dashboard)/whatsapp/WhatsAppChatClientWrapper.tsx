@@ -39,8 +39,22 @@ export default function WhatsAppChatClientWrapper({
     try {
       setLoadingContacts(true);
       const res = await fetch(`/api/whatsapp/contacts?limit=100`);
-      if (!res.ok) throw new Error("Error fetching contacts");
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error("API Error fetching contacts:", res.status, errorText);
+        throw new Error(`Error fetching contacts: ${res.status}`);
+      }
+
       const data = await res.json();
+
+      // Ensure data has the expected structure
+      if (!data || typeof data !== 'object') {
+        console.error("Invalid API response:", data);
+        setContacts([]);
+        return;
+      }
+
       setContacts(data.contacts || []);
     } catch (error) {
       console.error("Error fetching contacts:", error);
@@ -56,8 +70,23 @@ export default function WhatsAppChatClientWrapper({
       const res = await fetch(
         `/api/whatsapp/conversations/${encodeURIComponent(phoneE164)}`
       );
-      if (!res.ok) throw new Error("Error fetching conversation");
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error("API Error fetching conversation:", res.status, errorText);
+        throw new Error(`Error fetching conversation: ${res.status}`);
+      }
+
       const data = await res.json();
+
+      // Ensure data has expected structure
+      if (!data || typeof data !== 'object') {
+        console.error("Invalid API response:", data);
+        setContact(undefined);
+        setMessages([]);
+        return;
+      }
+
       setContact(data.contact);
       setMessages(data.messages || []);
     } catch (error) {
@@ -83,16 +112,20 @@ export default function WhatsAppChatClientWrapper({
       });
 
       if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || "Error sending message");
+        const errorText = await res.text();
+        console.error("API Error sending message:", res.status, errorText);
+        throw new Error(`Error sending message: ${res.status}`);
       }
 
       const data = await res.json();
-      // Add sent message to the list
-      setMessages((prev) => [...prev, data.message]);
 
-      // Refresh contacts to update last message
-      fetchContacts();
+      // Add sent message to the list
+      if (data && data.message) {
+        setMessages((prev) => [...prev, data.message]);
+
+        // Refresh contacts to update last message
+        fetchContacts();
+      }
     } catch (error) {
       console.error("Error sending message:", error);
       throw error;
