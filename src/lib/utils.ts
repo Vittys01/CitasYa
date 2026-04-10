@@ -178,9 +178,10 @@ export function formatPhoneNumber(phoneE164: string): string {
 }
 
 /** Format relative time (e.g. "hace 5 min", "ayer") */
-export function formatRelativeTime(date: Date): string {
+export function formatRelativeTime(date: Date | string): string {
+  const dateObj = typeof date === "string" ? new Date(date) : date;
   const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
+  const diffMs = now.getTime() - dateObj.getTime();
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);
@@ -191,7 +192,7 @@ export function formatRelativeTime(date: Date): string {
   if (diffDays === 1) return "ayer";
   if (diffDays < 7) return `hace ${diffDays} días`;
 
-  return date.toLocaleDateString("es-ES", {
+  return dateObj.toLocaleDateString("es-ES", {
     day: "2-digit",
     month: "2-digit",
   });
