@@ -19,6 +19,7 @@ export default function WhatsAppChatClientWrapper({
   const [messages, setMessages] = useState<any[]>([]);
   const [loadingContacts, setLoadingContacts] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Fetch contacts
   useEffect(() => {
@@ -38,12 +39,16 @@ export default function WhatsAppChatClientWrapper({
   const fetchContacts = async () => {
     try {
       setLoadingContacts(true);
+      setError(null);
+
       const res = await fetch(`/api/whatsapp/contacts?limit=100`);
 
       if (!res.ok) {
         const errorText = await res.text();
         console.error("API Error fetching contacts:", res.status, errorText);
-        throw new Error(`Error fetching contacts: ${res.status}`);
+        setError(`Error ${res.status}: ${errorText}`);
+        setContacts([]);
+        return;
       }
 
       const data = await res.json();
@@ -51,13 +56,17 @@ export default function WhatsAppChatClientWrapper({
       // Ensure data has the expected structure
       if (!data || typeof data !== 'object') {
         console.error("Invalid API response:", data);
+        setError("Invalid response from server");
         setContacts([]);
         return;
       }
 
-      setContacts(data.contacts || []);
+      const contactsData = data.contacts || [];
+      console.log("Contacts fetched:", contactsData);
+      setContacts(contactsData);
     } catch (error) {
       console.error("Error fetching contacts:", error);
+      setError(error instanceof Error ? error.message : "Unknown error");
       setContacts([]);
     } finally {
       setLoadingContacts(false);
@@ -67,6 +76,8 @@ export default function WhatsAppChatClientWrapper({
   const fetchConversation = async (phoneE164: string) => {
     try {
       setLoadingMessages(true);
+      setError(null);
+
       const res = await fetch(
         `/api/whatsapp/conversations/${encodeURIComponent(phoneE164)}`
       );
@@ -74,23 +85,32 @@ export default function WhatsAppChatClientWrapper({
       if (!res.ok) {
         const errorText = await res.text();
         console.error("API Error fetching conversation:", res.status, errorText);
-        throw new Error(`Error fetching conversation: ${res.status}`);
-      }
-
-      const data = await res.json();
-
-      // Ensure data has expected structure
-      if (!data || typeof data !== 'object') {
-        console.error("Invalid API response:", data);
+        setError(`Error ${res.status}: ${errorText}`);
         setContact(undefined);
         setMessages([]);
         return;
       }
 
-      setContact(data.contact);
-      setMessages(data.messages || []);
+      const data = await res.json();
+
+      // Ensure data has the expected structure
+      if (!data || typeof data !== 'object') {
+        console.error("Invalid API response:", data);
+        setError("Invalid response from server");
+        setContact(undefined);
+        setMessages([]);
+        return;
+      }
+
+      const contactData = data.contact;
+      const messagesData = data.messages || [];
+      console.log("Conversation fetched:", { contactData, messagesData });
+
+      setContact(contactData);
+      setMessages(messagesData);
     } catch (error) {
       console.error("Error fetching conversation:", error);
+      setError(error instanceof Error ? error.message : "Unknown error");
       setContact(undefined);
       setMessages([]);
     } finally {
@@ -102,6 +122,8 @@ export default function WhatsAppChatClientWrapper({
     if (!contact) return;
 
     try {
+      setError(null);
+
       const res = await fetch("/api/whatsapp/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -114,6 +136,7 @@ export default function WhatsAppChatClientWrapper({
       if (!res.ok) {
         const errorText = await res.text();
         console.error("API Error sending message:", res.status, errorText);
+        setError(`Error ${res.status}: ${errorText}`);
         throw new Error(`Error sending message: ${res.status}`);
       }
 
@@ -128,6 +151,7 @@ export default function WhatsAppChatClientWrapper({
       }
     } catch (error) {
       console.error("Error sending message:", error);
+      setError(error instanceof Error ? error.message : "Unknown error");
       throw error;
     }
   };
@@ -140,6 +164,19 @@ export default function WhatsAppChatClientWrapper({
 
   return (
     <div className="flex h-[calc(100vh-4rem)]">
+      {/* Error Display */}
+      {error && (
+        <div className="fixed top-0 left-0 right-0 bg-red-500 text-white p-4 z-50 flex justify-between items-center">
+          <span className="flex-1">{error}</span>
+          <button
+            onClick={() => setError(null)}
+            className="ml-4 text-white hover:text-gray-200"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Mobile view: show contacts or chat */}
       <div className="flex-1 flex md:hidden">
         {selectedPhone ? (
