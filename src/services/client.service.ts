@@ -22,7 +22,22 @@ export async function updateClient(
   input: UpdateClientInput
 ): Promise<Client> {
   const data: { name?: string; phone?: string; email?: string | null; notes?: string } = { ...input };
-  if (input.phone) data.phone = normalisePhone(input.phone);
+  if (input.phone) {
+    const phone = normalisePhone(input.phone);
+
+    // Check if phone is already taken by another client
+    const existing = await prisma.client.findFirst({
+      where: {
+        phone,
+        id: { not: id },
+      },
+    });
+    if (existing) {
+      throw new Error(`Ya existe un cliente con el teléfono ${phone}.`);
+    }
+
+    data.phone = phone;
+  }
   if (Object.prototype.hasOwnProperty.call(input, "email")) {
     data.email = (input.email && input.email.trim()) ? input.email.trim() : null;
   }

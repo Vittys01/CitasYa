@@ -5,6 +5,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import type { PaginationMeta } from "@/types";
 import type { Client } from "@prisma/client";
+import EditClientButton from "@/components/clients/EditClientButton";
 
 type ClientWithCount = Client & { _count: { appointments: number } };
 
@@ -73,12 +74,15 @@ export default function ClientsTable({ clients, meta, query, settings }: Clients
               <th className="hidden w-[16%] px-5 py-3.5 text-[10px] font-bold text-earth-muted uppercase tracking-wider lg:table-cell">
                 {get(settings, "table.notes", "Notas")}
               </th>
+              <th className="w-[10%] px-5 py-3.5 text-[10px] font-bold text-earth-muted uppercase tracking-wider">
+                {get(settings, "table.actions", "Acciones")}
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#f0ede8]">
             {clients.length === 0 ? (
               <tr>
-                <td colSpan={5} className="text-center py-16">
+                <td colSpan={6} className="text-center py-16">
                   <div className="flex flex-col items-center text-[#bda696]">
                     <span className="material-symbols-outlined text-4xl mb-2">person_search</span>
                     <p className="text-sm">{get(settings, "empty.clients", "No se encontraron clientes")}</p>
@@ -120,6 +124,18 @@ export default function ClientsTable({ clients, meta, query, settings }: Clients
                   </td>
                   <td className="px-5 py-3.5 hidden lg:table-cell">
                     <p className="text-xs text-[#bda696] truncate max-w-xs">{client.notes ?? "—"}</p>
+                  </td>
+                  <td className="px-5 py-3.5">
+                    <EditClientButton
+                      clientId={client.id}
+                      initialData={{
+                        name: client.name,
+                        phone: client.phone,
+                        email: client.email,
+                        notes: client.notes,
+                      }}
+                      settings={settings}
+                    />
                   </td>
                 </tr>
               ))

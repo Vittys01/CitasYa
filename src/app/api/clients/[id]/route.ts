@@ -43,7 +43,11 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const updated = await updateClient(id, parsed.data);
     return NextResponse.json(apiSuccess(updated));
   } catch (err) {
-    return NextResponse.json(apiError(String(err)), { status: 409 });
+    const errorMessage = String(err);
+    if (errorMessage.includes("Ya existe un cliente con el teléfono")) {
+      return NextResponse.json(apiError(errorMessage, "CONFLICT"), { status: 409 });
+    }
+    return NextResponse.json(apiError(errorMessage), { status: 409 });
   }
 }
 
