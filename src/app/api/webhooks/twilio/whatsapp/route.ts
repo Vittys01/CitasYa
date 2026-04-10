@@ -27,20 +27,28 @@ export async function POST(req: NextRequest) {
 
     console.log("[Twilio Webhook] Incoming message:", params);
 
-    // Extract message details
+    // Extract message details - Using WaId as phone number and Body as content
     const toRaw = params.To || "";
     const accountSid = params.AccountSid;
-    const from = params.From; // E.164 format from Twilio (whatsapp:+1234567890)
+    const waId = params.WaId; // Phone number from Twilio (e.g., 573206131892)
     const body = params.Body || "";
     const messageSid = params.MessageSid;
+    const from = params.From; // Full format (e.g., whatsapp:+573206131892)
 
-    if (!from || !body || !accountSid) {
-      console.log("[Twilio Webhook] Missing required fields");
+    if (!waId || !body || !accountSid) {
+      console.log("[Twilio Webhook] Missing required fields. WaId:", waId, "Body:", body, "AccountSid:", accountSid);
       return new NextResponse(null, { status: 200 });
     }
 
-    // Extract E.164 phone number from Twilio format
-    const phoneE164 = from.replace("whatsapp:", "").trim();
+    // Use WaId directly as phoneE164 (it's the clean phone number without prefix)
+    // Optionally add + if it doesn't have it
+    const phoneE164 = waId.startsWith("+") ? waId : `+${waId}`;
+
+    console.log("[Twilio Webhook] Processing message:");
+    console.log("  From (WaId):", waId);
+    console.log("  To:", toRaw);
+    console.log("  Body:", body);
+    console.log("  PhoneE164:", phoneE164);
 
     // Find business by Twilio WhatsApp number (To field)
     const business = await prisma.business.findFirst({
@@ -52,6 +60,36 @@ export async function POST(req: NextRequest) {
 
     if (!business) {
       console.log("[Twilio Webhook] Business not found for WhatsApp number:", toRaw);
+
+      // Fallback: Try to find any active business
+      const fallbackBusiness = await prisma.business.findFirst({
+        where: {
+          isActive: true,
+        },
+      });
+
+      if (fallbackBusiness) {
+        console.log("[Twilio Webhook] Using fallback business:", fallbackBusiness.name);
+
+        // Save incoming message to database with fallback business
+        await saveIncomingMessage(
+          fallbackBusiness.id,
+          phoneE164,
+          body,
+          {
+            provider: "twilio",
+            messageSid,
+            to: toRaw,
+            waId,
+          },
+          messageSid
+        );
+
+        console.log("[Twilio Webhook] Message saved from:", phoneE164, "to fallback business:", fallbackBusiness.name);
+      } else {
+        console.log("[Twilio Webhook] No active businesses found, message not saved");
+      }
+
       return new NextResponse(null, { status: 200 });
     }
 
@@ -64,6 +102,7 @@ export async function POST(req: NextRequest) {
         provider: "twilio",
         messageSid,
         to: toRaw,
+        waId,
       },
       messageSid
     );
