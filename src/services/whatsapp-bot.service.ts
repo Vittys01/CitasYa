@@ -120,7 +120,7 @@ export interface BotOptions {
 /**
  * Punto de entrada principal para procesar mensajes del bot
  */
-export async function handleWhatsAppMessage(options: BotOptions): Promise<void> {
+async function handleWhatsAppMessage(options: BotOptions): Promise<void> {
   const { businessId, phoneE164, text } = options;
 
   console.log(

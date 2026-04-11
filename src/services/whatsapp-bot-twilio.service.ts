@@ -144,7 +144,7 @@ export interface BotOptions {
 /**
  * Punto de entrada principal para procesar mensajes del bot (Twilio)
  */
-export async function handleTwilioWhatsAppMessage(
+async function handleTwilioWhatsAppMessage(
   businessId: string,
   phoneE164: string,
   text: string
