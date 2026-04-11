@@ -204,7 +204,7 @@ async function processMessage(
   const command = detectCommand(normalizedText);
 
   // Si hay comando global y se puede procesar en este estado
-  if (command && canProcessGlobalCommand(session.step)) {
+  if (command && canProcessGlobalCommand(session.step as BotStep)) {
     return await processCommand(session, command, text, sessionData);
   }
 
