@@ -209,6 +209,18 @@ async function processMessage(
     return await processCommand(session, command, text, sessionData);
   }
 
+  // Detectar intención de NLP
+  const intent = detectIntent(text);
+
+  // Manejar intenciones específicas en cualquier estado
+  if (intent.type === "service_inquiry" && session.step === "idle") {
+    return await handleServiceInquiry(session, sessionData);
+  }
+
+  if (intent.type === "manicurist_inquiry" && session.step === "idle") {
+    return await handleManicuristInquiry(session, sessionData);
+  }
+
   // Si no hay comando y estamos en idle, mostrar menú
   if (session.step === "idle" && !command) {
     return await handleIdleState(session, sessionData, text);
@@ -265,6 +277,12 @@ async function processCommand(
 
     case "DISPONIBILIDAD":
       return await handleAvailabilityQuery(session, data);
+
+    case "SERVICIOS":
+      return await handleServiceInquiry(session, data);
+
+    case "MANICURISTAS":
+      return await handleManicuristInquiry(session, data);
 
     default:
       return {
@@ -1294,6 +1312,81 @@ function getPreviousStep(currentStep: BotStep): BotStep {
   );
 }
 
+// ─── Manejo de Consulta de Servicios ─────────────────────────────────
+
+async function handleServiceInquiry(
+  session: WhatsAppBotSession,
+  data: BotSessionData
+): Promise<BotResponse> {
+  const services = await getAvailableServices(session.businessId);
+
+  if (services.length === 0) {
+    return {
+      message: "Lo siento, por el momento no tenemos servicios disponibles. Por favor contactanos más tarde.",
+      nextStep: "idle",
+    };
+  }
+
+  let message = "💅 ¡Claro! Estos son nuestros servicios:\n\n";
+
+  services.forEach((service, index) => {
+    message += `✨ ${service.name}`;
+    if (service.duration) {
+      message += ` (${service.duration} min)`;
+    }
+    if (service.description) {
+      message += `\n   ${service.description}`;
+    }
+    message += "\n\n";
+  });
+
+  message += "¿Quieres agendar alguno? 😊\n\n";
+  message += "Escribí AGENDAR para comenzar.";
+
+  return {
+    message,
+    nextStep: "idle",
+  };
+}
+
+// ─── Manejo de Consulta de Manicuristas ───────────────────────────────
+
+async function handleManicuristInquiry(
+  session: WhatsAppBotSession,
+  data: BotSessionData
+): Promise<BotResponse> {
+  const manicurists = await getAvailableManicurists(session.businessId);
+
+  if (manicurists.length === 0) {
+    return {
+      message: "Lo siento, por el momento no tenemos manicuristas disponibles. Por favor contactanos más tarde.",
+      nextStep: "idle",
+    };
+  }
+
+  let message = "😊 Trabajamos con:\n\n";
+
+  manicurists.forEach((manicurist, index) => {
+    message += `👩‍🎨 ${manicurist.user.name}`;
+
+    // Agregar especialidades si están disponibles
+    if (manicurist.user.email) {
+      // Puedes agregar especialidades o descripciones aquí si las tienes
+      message += `\n   (Especialista)`;
+    }
+
+    message += "\n\n";
+  });
+
+  message += "¿Prefieres alguna? 😊\n\n";
+  message += "Escribí AGENDAR para comenzar o el nombre de la manicurista.";
+
+  return {
+    message,
+    nextStep: "idle",
+  };
+}
+
 // ─── Manejo de Consulta de Disponibilidad ───────────────────────────────
 
 async function handleAvailabilityQuery(
@@ -1313,7 +1406,7 @@ async function handleAvailabilityQuery(
     };
   }
 
-  let message = "✨ Disponibilidad para las próximas 24h:\n\n";
+  let message = "💅 Te muestro opciones:\n\n";
 
   for (const manicurist of manicurists.slice(0, 3)) {
     // Solo mostrar 3 manicuristas máximo
@@ -1339,7 +1432,7 @@ async function handleAvailabilityQuery(
               format(toCanaryTimezone(s.start), "HH:mm", { locale: es })
           )
           .join(", ");
-        message += `  • Hoy: ${times}\n`;
+        message += `  📅 Hoy: ${times}\n`;
       }
       if (tomorrowSlots.length > 0) {
         const times = tomorrowSlots
@@ -1349,13 +1442,14 @@ async function handleAvailabilityQuery(
               format(toCanaryTimezone(s.start), "HH:mm", { locale: es })
           )
           .join(", ");
-        message += `  • Mañana: ${times}\n`;
+        message += `  📅 Mañana: ${times}\n`;
       }
       message += "\n";
     }
   }
 
-  message += `Para agendar, escribí AGENDAR.`;
+  message += "Responde con día y hora 😊\n\n";
+  message += "Escribí AGENDAR para comenzar.";
 
   return {
     message,

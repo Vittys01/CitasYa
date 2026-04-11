@@ -12,7 +12,7 @@ import { toCanaryTimezone } from "./utils";
 // ─── Tipos ─────────────────────────────────────────────────────────────────────
 
 export interface NLPIntent {
-  type: "booking" | "viewing" | "cancelling" | "availability" | "help" | "menu" | "greeting" | "goodbye" | "confirmation" | "negation" | "back" | "change" | "unknown";
+  type: "booking" | "viewing" | "cancelling" | "availability" | "help" | "menu" | "service_inquiry" | "manicurist_inquiry" | "greeting" | "goodbye" | "confirmation" | "negation" | "back" | "change" | "unknown";
   confidence: number; // 0-1
   entities: NLPEntities;
 }
@@ -62,7 +62,9 @@ const INTENT_KEYWORDS = {
   availability: [
     "disponibilidad", "disponible", "libre", "horarios",
     "cuándo", "cuando", "qué hora", "a qué hora",
-    "horario", "horarios", "cuando esta", "cuando está"
+    "horario", "horarios", "cuando esta", "cuando está",
+    "qué tienen", "tienen disponible", "qué horarios",
+    "disponible", "libre"
   ],
   help: [
     "ayuda", "help", "comandos", "instrucciones", "cómo",
@@ -71,6 +73,18 @@ const INTENT_KEYWORDS = {
   menu: [
     "menú", "menu", "opciones", "volver", "inicio",
     "empezar", "de nuevo", "nuevo", "reiniciar"
+  ],
+  service_inquiry: [
+    "qué servicios", "servicios", "qué hacen", "hacen",
+    "qué ofrecen", "ofrecen", "tipos de", "qué tipo",
+    "manicura", "uñas", "pedicura", "qué incluye",
+    "precios", "costos", "cuánto cuesta", "vale"
+  ],
+  manicurist_inquiry: [
+    "qué manicuristas", "manicuristas", "quién", "quién trabaja",
+    "con quién puedo", "quién atiende", "quién hace",
+    "personal", "equipo", "staff", "empleados",
+    "puedo elegir", "opciones", "preferencia"
   ],
   greeting: [
     "hola", "buen día", "buenos días", "buenas tardes",

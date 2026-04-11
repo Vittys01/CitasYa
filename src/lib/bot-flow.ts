@@ -25,7 +25,9 @@ export type BotCommand =
   | "CITAS"
   | "CANCELAR"
   | "AYUDA"
-  | "DISPONIBILIDAD";
+  | "DISPONIBILIDAD"
+  | "SERVICIOS"
+  | "MANICURISTAS";
 
 // ─── Datos de Sesión del Bot ─────────────────────────────────────────────────────
 
@@ -73,6 +75,11 @@ export function detectCommand(text: string): BotCommand | null {
     HELP: "AYUDA", // Sinónimo
     DISPONIBILIDAD: "DISPONIBILIDAD",
     DISPONIBLE: "DISPONIBILIDAD", // Sinónimo
+    SERVICIOS: "SERVICIOS",
+    SERVICIO: "SERVICIOS", // Sinónimo
+    MANICURISTAS: "MANICURISTAS",
+    MANICURISTA: "MANICURISTAS", // Sinónimo
+    EQUIPO: "MANICURISTAS", // Sinónimo
   };
 
   return commands[normalized] || null;
