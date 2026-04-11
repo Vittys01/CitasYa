@@ -1153,6 +1153,4 @@ async function getActiveAppointmentsForClient(
 
 export {
   handleWhatsAppMessage,
-  type BotResponse,
-  type BotOptions,
 };
