@@ -1,7 +1,8 @@
 /**
  * Webhook Twilio: mensajes entrantes de WhatsApp
  *
- * Recibe mensajes de Twilio y los guarda en la base de datos para el chat.
+ * Recibe mensajes de Twilio, los guarda en la base de datos para el chat,
+ * y procesa el bot para generar respuestas automáticas.
  *
  * Las confirmaciones/cancelaciones salientes no pasan por aquí: van por la API de Twilio
  * en `notification.service.ts` + `getWhatsAppProvider()`.
@@ -9,6 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { saveIncomingMessage } from "@/services/whatsapp-chat.service";
+import { handleTwilioWhatsAppMessage } from "@/services/whatsapp-bot-twilio.service";
 
 export const runtime = "nodejs";
 
@@ -86,6 +88,10 @@ export async function POST(req: NextRequest) {
         );
 
         console.log("[Twilio Webhook] Message saved from:", phoneE164, "to fallback business:", fallbackBusiness.name);
+
+        // Process message with bot to generate response
+        console.log("[Twilio Webhook] Processing message with bot...");
+        await handleTwilioWhatsAppMessage(fallbackBusiness.id, phoneE164, body);
       } else {
         console.log("[Twilio Webhook] No active businesses found, message not saved");
       }
@@ -108,6 +114,10 @@ export async function POST(req: NextRequest) {
     );
 
     console.log("[Twilio Webhook] Message saved from:", phoneE164, "to business:", business.name);
+
+    // Process message with bot to generate response
+    console.log("[Twilio Webhook] Processing message with bot...");
+    await handleTwilioWhatsAppMessage(business.id, phoneE164, body);
 
     // Respond 200 OK to Twilio
     return new NextResponse(null, { status: 200 });
