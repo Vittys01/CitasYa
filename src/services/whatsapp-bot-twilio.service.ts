@@ -16,7 +16,7 @@ import {
   getAvailableSlots,
 } from "@/services/appointment.service";
 import {
-  formatMenuMessage,
+  buildMenuMessage,
   buildMenuShort,
   buildBookingIntro,
   buildManicuristSelectionMessage,
