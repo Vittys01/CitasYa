@@ -229,8 +229,11 @@ async function resolveBusinessForTwilioInbound(params: {
  * Normaliza un número de teléfono a formato E.164
  */
 function normalisePhone(raw: string): string {
+  // Eliminar prefijos de WhatsApp (whatsapp:+...)
+  let cleaned = raw.replace(/^whatsapp:/i, "");
+
   // Eliminar espacios, guiones, paréntesis
-  const cleaned = raw.replace(/[\s\-\(\)]/g, "");
+  cleaned = cleaned.replace(/[\s\-\(\)]/g, "");
 
   // Si ya tiene el código de país con +, devolver tal cual
   if (cleaned.startsWith("+")) {
