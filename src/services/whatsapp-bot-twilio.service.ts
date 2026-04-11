@@ -258,7 +258,7 @@ async function processCommand(
     case "AYUDA":
       return {
         message: buildHelpMessage({ businessName: business?.name }),
-        nextStep: session.step, // No cambiar el estado
+        nextStep: session.step as BotStep, // No cambiar el estado
         shouldEndFlow: false,
       };
 
@@ -268,7 +268,7 @@ async function processCommand(
     default:
       return {
         message: buildInvalidOptionMessage(),
-        nextStep: session.step,
+        nextStep: session.step as BotStep,
         shouldEndFlow: false,
       };
   }
@@ -454,7 +454,7 @@ async function handleManicuristSelection(
 
   return {
     message: buildInvalidOptionMessage(),
-    nextStep: session.step,
+    nextStep: session.step as BotStep,
   };
 }
 
@@ -515,7 +515,7 @@ async function handleServiceSelection(
 
   return {
     message: buildInvalidOptionMessage(),
-    nextStep: session.step,
+    nextStep: session.step as BotStep,
   };
 }
 
@@ -535,7 +535,7 @@ async function handleDateSelection(
     if (!isValidFutureDate(selectedDate)) {
       return {
         message: buildPastDateMessage(),
-        nextStep: session.step,
+        nextStep: session.step as BotStep,
       };
     }
 
@@ -555,7 +555,7 @@ async function handleDateSelection(
   if (selection === null) {
     return {
       message: buildInvalidOptionMessage(),
-      nextStep: session.step,
+      nextStep: session.step as BotStep,
     };
   }
 
@@ -641,7 +641,7 @@ async function handleDateSelection(
     default:
       return {
         message: buildInvalidOptionMessage(),
-        nextStep: session.step,
+        nextStep: session.step as BotStep,
       };
   }
 }
@@ -656,14 +656,14 @@ async function handleCustomDateInput(
   if (!parsedDate) {
     return {
       message: buildInvalidDateMessage(),
-      nextStep: session.step,
+      nextStep: session.step as BotStep,
     };
   }
 
   if (!isValidFutureDate(parsedDate)) {
     return {
       message: buildPastDateMessage(),
-      nextStep: session.step,
+      nextStep: session.step as BotStep,
     };
   }
 
@@ -736,7 +736,7 @@ async function handleSlotSelection(
   if (index === null || index < 1 || index > slots.length) {
     return {
       message: buildInvalidSlotMessage(),
-      nextStep: session.step,
+      nextStep: session.step as BotStep,
     };
   }
 
@@ -909,7 +909,7 @@ async function handleCancellation(
   if (index === null || index < 1 || index > appointments.length) {
     return {
       message: buildInvalidCancelInputMessage(),
-      nextStep: session.step,
+      nextStep: session.step as BotStep,
     };
   }
 
@@ -1156,7 +1156,7 @@ async function handleChangeRequest(
 
   return {
     message,
-    nextStep: session.step,
+    nextStep: session.step as BotStep,
   };
 }
 
