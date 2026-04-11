@@ -60,11 +60,17 @@ Escribí MENU en cualquier momento para volver a este menú.`;
 }
 
 export function buildMenuShort(): string {
-  return `🔄 Volviendo al menú principal...
+  return `¡Claro! 😊
 
-1️⃣ Agendar cita
-2️⃣ Consultar mis citas
-3️⃣ Cancelar cita`;
+¿Qué deseas hacer?
+
+• Agendar cita 💅
+• Consultar disponibilidad 📅
+• Ver mis citas 📝
+
+Simplemente escribí lo que necesitas o elegí una opción.
+
+Si necesitas más ayuda, escribí AYUDA.`;
 }
 
 // ─── Mensajes de Agendado ──────────────────────────────────────────────────────
@@ -303,19 +309,31 @@ Si necesitás asistencia especial, podés contactar directamente al equipo de ${
 // ─── Mensajes de Cliente ─────────────────────────────────────────────────────
 
 export function buildWelcomeForNewClient(): string {
-  return `👋 ¡Bienvenido! Parece que es tu primera vez.
-
-Vamos a agendar tu primera cita. Si en algún momento necesitás ayuda, escribí AYUDA.`;
-}
-
-export function buildWelcomeForExistingClient(name: string): string {
-  return `👋 ¡Hola ${name}! Bueno verte de nuevo.
+  return `¡Hola! 👋 Soy tu asistente de agendado.
 
 ¿Qué deseas hacer hoy?
 
-1️⃣ Agendar cita
-2️⃣ Consultar mis citas
-3️⃣ Cancelar cita`;
+• Agendar una cita 💅
+• Consultar disponibilidad 📅
+• Ver mis citas 📝
+
+Para comenzar, simplemente escribí tu preferencia (ej: "cita para mañana con Paola") o elegí una opción.
+
+Si necesitás ayuda en cualquier momento, escribí AYUDA.`;
+}
+
+export function buildWelcomeForExistingClient(name: string): string {
+  return `¡Hola ${name}! 👋 Bueno verte de nuevo.
+
+¿Qué deseas hacer hoy?
+
+• Agendar una cita 💅
+• Ver mis citas 📝
+• Cancelar una cita ❌
+
+Para comenzar, escribí tu preferencia (ej: "cita mañana") o seleccioná una opción.
+
+Si necesitás ayuda, escribí AYUDA.`;
 }
 
 // ─── Mensajes de Error ───────────────────────────────────────────────────────
