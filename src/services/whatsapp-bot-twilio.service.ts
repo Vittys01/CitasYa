@@ -1,7 +1,7 @@
 /**
- * WhatsApp Bot Service (Meta WhatsApp Cloud API)
+ * WhatsApp Bot Service (Twilio WhatsApp)
  *
- * Servicio que gestiona el bot de agendado por WhatsApp usando Meta WhatsApp Cloud API.
+ * Servicio que gestiona el bot de agendado por WhatsApp usando Twilio WhatsApp.
  * Procesa mensajes entrantes, mantiene sesiones de conversación y permite
  * agendar citas de forma interactiva.
  */
@@ -53,6 +53,10 @@ import {
   buildDoneMessage,
   formatErrorWithHelp,
 } from "@/lib/bot-messages";
+import {
+  findBestMatch,
+  calculateSimilarity,
+} from "@/lib/nlp-bot";
 import type {
   WhatsAppBotSession,
   ManicuristWithUser,
@@ -87,6 +91,16 @@ import {
   classifyError,
   getErrorMessage,
 } from "@/lib/bot-flow";
+import {
+  detectIntent,
+  extractDates,
+  extractTimes,
+  analyzeSelection,
+  processComplexQuery,
+  type NLPIntent,
+  type NLPEntities,
+  ConversationContext,
+} from "@/lib/nlp-bot";
 import { addDays, format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { toCanaryTimezone, normalisePhone } from "@/lib/utils";
@@ -109,6 +123,16 @@ export interface BotResponse {
   shouldEndFlow?: boolean;
 }
 
+export interface TwilioInboundForm {
+  MessageSid: string;
+  From: string;
+  To: string;
+  Body?: string;
+  NumMedia?: string;
+  MediaContentType0?: string;
+  MediaUrl0?: string;
+}
+
 export interface BotOptions {
   businessId: string;
   phoneE164: string;
@@ -118,13 +142,15 @@ export interface BotOptions {
 // ─── Funciones Principales ─────────────────────────────────────────────────────
 
 /**
- * Punto de entrada principal para procesar mensajes del bot
+ * Punto de entrada principal para procesar mensajes del bot (Twilio)
  */
-export async function handleWhatsAppMessage(options: BotOptions): Promise<void> {
-  const { businessId, phoneE164, text } = options;
-
+export async function handleTwilioWhatsAppMessage(
+  businessId: string,
+  phoneE164: string,
+  text: string
+): Promise<void> {
   console.log(
-    `[WhatsApp Bot] Processing message from ${phoneE164} for business ${businessId}: "${text}"`
+    `[WhatsApp Bot - Twilio] Processing message from ${phoneE164} for business ${businessId}: "${text}"`
   );
 
   try {
@@ -150,16 +176,16 @@ export async function handleWhatsAppMessage(options: BotOptions): Promise<void> 
     await sendMessage(businessId, phoneE164, response.message);
 
     console.log(
-      `[WhatsApp Bot] Response sent to ${phoneE164}. Next step: ${response.nextStep || "idle"}`
+      `[WhatsApp Bot - Twilio] Response sent to ${phoneE164}. Next step: ${response.nextStep || "idle"}`
     );
   } catch (error) {
-    console.error("[WhatsApp Bot] Error handling message:", error);
+    console.error("[WhatsApp Bot - Twilio] Error handling message:", error);
 
     try {
       const errorMessage = buildGenericErrorMessage();
       await sendMessage(businessId, phoneE164, errorMessage);
     } catch (sendError) {
-      console.error("[WhatsApp Bot] Error sending error message:", sendError);
+      console.error("[WhatsApp Bot - Twilio] Error sending error message:", sendError);
     }
   }
 }
@@ -212,6 +238,10 @@ async function processCommand(
       };
 
     case "AGENDAR":
+      // Si ya hay datos de cita, intentar continuar desde donde se quedó
+      if (data.manicuristId || data.serviceId) {
+        return await continueBookingFlow(session, data);
+      }
       return await startBookingFlow(session, data);
 
     case "CITAS":
@@ -253,6 +283,17 @@ async function processFlowStep(
   data: BotSessionData,
   command: BotCommand | null
 ): Promise<BotResponse> {
+  // Detectar intención de cambio o retroceso
+  const intent = detectIntent(text);
+
+  if (intent.type === "back" || intent.type === "menu") {
+    return await goToPreviousStep(session, data);
+  }
+
+  if (intent.type === "change") {
+    return await handleChangeRequest(session, data, text);
+  }
+
   switch (session.step) {
     case "manicurist":
       return await handleManicuristSelection(session, text, data);
@@ -356,33 +397,64 @@ async function handleManicuristSelection(
   data: BotSessionData
 ): Promise<BotResponse> {
   const manicurists = await getAvailableManicurists(session.businessId);
-  const index = textToIndex(text, manicurists.map((m) => m.user.name));
 
-  if (index === null) {
+  // Intentar coincidencia numérica exacta primero
+  const numberMatch = text.match(/^\d+$/);
+  if (numberMatch) {
+    const num = parseInt(numberMatch[0], 10);
+    if (num >= 1 && num <= manicurists.length) {
+      const selected = manicurists[num - 1];
+      const updatedData = updateSessionData(data, {
+        manicuristId: selected.id,
+        manicuristName: selected.user.name,
+      });
+
+      await prisma.whatsAppBotSession.update({
+        where: { id: session.id },
+        data: { data: updatedData },
+      });
+
+      const services = await getAvailableServices(session.businessId);
+
+      return {
+        message: `${buildManicuristConfirmedMessage(selected.user.name)}\n\n${buildServiceSelectionMessage(
+          { services }
+        )}`,
+        nextStep: "service",
+      };
+    }
+  }
+
+  // Intentar coincidencia fuzzy por nombre
+  const manicuristNames = manicurists.map((m) => m.user.name);
+  const bestMatch = findBestMatch(text, manicuristNames, 0.6);
+
+  if (bestMatch.matched) {
+    const selectedIndex = manicuristNames.indexOf(bestMatch.value as string);
+    const selected = manicurists[selectedIndex];
+    const updatedData = updateSessionData(data, {
+      manicuristId: selected.id,
+      manicuristName: selected.user.name,
+    });
+
+    await prisma.whatsAppBotSession.update({
+      where: { id: session.id },
+      data: { data: updatedData },
+    });
+
+    const services = await getAvailableServices(session.businessId);
+
     return {
-      message: buildInvalidOptionMessage(),
-      nextStep: session.step,
+      message: `${buildManicuristConfirmedMessage(selected.user.name)}\n\n${buildServiceSelectionMessage(
+        { services }
+      )}`,
+      nextStep: "service",
     };
   }
 
-  const selected = manicurists[index];
-  const updatedData = updateSessionData(data, {
-    manicuristId: selected.id,
-    manicuristName: selected.user.name,
-  });
-
-  await prisma.whatsAppBotSession.update({
-    where: { id: session.id },
-    data: { data: updatedData },
-  });
-
-  const services = await getAvailableServices(session.businessId);
-
   return {
-    message: `${buildManicuristConfirmedMessage(selected.user.name)}\n\n${buildServiceSelectionMessage(
-      { services }
-    )}`,
-    nextStep: "service",
+    message: buildInvalidOptionMessage(),
+    nextStep: session.step,
   };
 }
 
@@ -392,30 +464,58 @@ async function handleServiceSelection(
   data: BotSessionData
 ): Promise<BotResponse> {
   const services = await getAvailableServices(session.businessId);
-  const index = textToIndex(text, services.map((s) => s.name));
 
-  if (index === null) {
+  // Intentar coincidencia numérica exacta primero
+  const numberMatch = text.match(/^\d+$/);
+  if (numberMatch) {
+    const num = parseInt(numberMatch[0], 10);
+    if (num >= 1 && num <= services.length) {
+      const selected = services[num - 1];
+      const updatedData = updateSessionData(data, {
+        serviceId: selected.id,
+        serviceName: selected.name,
+        serviceDuration: selected.duration,
+      });
+
+      await prisma.whatsAppBotSession.update({
+        where: { id: session.id },
+        data: { data: updatedData },
+      });
+
+      return {
+        message: `${buildServiceConfirmedMessage(selected.name, selected.duration)}\n\n${buildDateSelectionMessage()}`,
+        nextStep: "date",
+      };
+    }
+  }
+
+  // Intentar coincidencia fuzzy por nombre
+  const serviceNames = services.map((s) => s.name);
+  const bestMatch = findBestMatch(text, serviceNames, 0.6);
+
+  if (bestMatch.matched) {
+    const selectedIndex = serviceNames.indexOf(bestMatch.value as string);
+    const selected = services[selectedIndex];
+    const updatedData = updateSessionData(data, {
+      serviceId: selected.id,
+      serviceName: selected.name,
+      serviceDuration: selected.duration,
+    });
+
+    await prisma.whatsAppBotSession.update({
+      where: { id: session.id },
+      data: { data: updatedData },
+    });
+
     return {
-      message: buildInvalidOptionMessage(),
-      nextStep: session.step,
+      message: `${buildServiceConfirmedMessage(selected.name, selected.duration)}\n\n${buildDateSelectionMessage()}`,
+      nextStep: "date",
     };
   }
 
-  const selected = services[index];
-  const updatedData = updateSessionData(data, {
-    serviceId: selected.id,
-    serviceName: selected.name,
-    serviceDuration: selected.duration,
-  });
-
-  await prisma.whatsAppBotSession.update({
-    where: { id: session.id },
-    data: { data: updatedData },
-  });
-
   return {
-    message: `${buildServiceConfirmedMessage(selected.name, selected.duration)}\n\n${buildDateSelectionMessage()}`,
-    nextStep: "date",
+    message: buildInvalidOptionMessage(),
+    nextStep: session.step,
   };
 }
 
@@ -424,6 +524,32 @@ async function handleDateSelection(
   text: string,
   data: BotSessionData
 ): Promise<BotResponse> {
+  // Primero, intentar procesamiento de lenguaje natural
+  const intent = detectIntent(text);
+  const extractedDates = extractDates(text);
+
+  // Si el usuario escribió una fecha específica en lenguaje natural
+  if (intent.type === "booking" && extractedDates.length > 0) {
+    const selectedDate = extractedDates[0];
+
+    if (!isValidFutureDate(selectedDate)) {
+      return {
+        message: buildPastDateMessage(),
+        nextStep: session.step,
+      };
+    }
+
+    const dateStr = selectedDate.toISOString();
+    const updatedData = updateSessionData(data, { selectedDate: dateStr });
+    await prisma.whatsAppBotSession.update({
+      where: { id: session.id },
+      data: { data: updatedData },
+    });
+
+    return await showAvailableSlots(session, updatedData, selectedDate);
+  }
+
+  // Fallback a selección numérica tradicional
   const selection = extractSelectionIndex(text);
 
   if (selection === null) {
@@ -484,7 +610,7 @@ async function handleDateSelection(
           selectedDate: undefined,
           customDateInput: "",
         });
-        await prisma.whatsappBotSession.update({
+        await prisma.whatsAppBotSession.update({
           where: { id: session.id },
           data: { data: updatedData },
         });
@@ -794,7 +920,7 @@ async function handleCancellation(
   });
 
   const cleanedData = clearTemporarySessionData(data);
-  await prisma.whatsappBotSession.update({
+  await prisma.whatsAppBotSession.update({
     where: { id: session.id },
     data: { data: cleanedData, step: "idle" },
   });
@@ -821,7 +947,7 @@ async function handleCancelSpecificAppointment(
       clientName: client.name,
     });
 
-    await prisma.whatsappBotSession.update({
+    await prisma.whatsAppBotSession.update({
       where: { id: session.id },
       data: { data: updatedData },
     });
@@ -854,7 +980,7 @@ async function handleCancelSpecificAppointment(
   });
 
   const cleanedData = clearTemporarySessionData(updatedData);
-  await prisma.whatsappBotSession.update({
+  await prisma.whatsAppBotSession.update({
     where: { id: session.id },
     data: { data: cleanedData, step: "idle" },
   });
@@ -864,6 +990,197 @@ async function handleCancelSpecificAppointment(
     nextStep: "idle",
     shouldEndFlow: true,
   };
+}
+
+// ─── Manejo de Navegación y Cambios ─────────────────────────────────
+
+/**
+ * Continúa el flujo de agendado desde donde se quedó
+ */
+async function continueBookingFlow(
+  session: WhatsAppBotSession,
+  data: BotSessionData
+): Promise<BotResponse> {
+  const updatedData = clearTemporarySessionData(data);
+
+  await prisma.whatsAppBotSession.update({
+    where: { id: session.id },
+    data: { data: updatedData },
+  });
+
+  return await startBookingFlow(session, updatedData);
+}
+
+/**
+ * Navega al paso anterior del flujo
+ */
+async function goToPreviousStep(
+  session: WhatsAppBotSession,
+  data: BotSessionData
+): Promise<BotResponse> {
+  const previousStep = getPreviousStep(session.step);
+
+  await prisma.whatsAppBotSession.update({
+    where: { id: session.id },
+    data: { step: previousStep },
+  });
+
+  let message = "";
+
+  switch (previousStep) {
+    case "idle":
+      message = buildMenuShort();
+      break;
+
+    case "manicurist":
+      message = "Volviendo a selección de manicurista...";
+      break;
+
+    case "service":
+      message = "Volviendo a selección de servicio...";
+      break;
+
+    case "date":
+      message = "Volviendo a selección de fecha...";
+      break;
+
+    case "slot":
+      message = "Volviendo a selección de horario...";
+      break;
+
+    default:
+      message = buildMenuShort();
+  }
+
+  // Si volvemos a un paso específico, mostrar las opciones correspondientes
+  if (previousStep !== "idle") {
+    const tempStep = session.step;
+    session.step = previousStep;
+
+    const response = await processFlowStep(session, "CONTINUE", data, null);
+
+    // Restaurar el paso original temporalmente
+    session.step = tempStep;
+
+    return {
+      message: `${message}\n\n${response.message}`,
+      nextStep: previousStep,
+    };
+  }
+
+  return {
+    message,
+    nextStep: previousStep,
+  };
+}
+
+/**
+ * Maneja solicitudes de cambio/modificación
+ */
+async function handleChangeRequest(
+  session: WhatsAppBotSession,
+  data: BotSessionData,
+  text: string
+): Promise<BotResponse> {
+  // Analizar qué quiere cambiar el usuario
+  const manicurists = await getAvailableManicurists(session.businessId);
+  const services = await getAvailableServices(session.businessId);
+
+  const manicuristNames = manicurists.map((m) => m.user.name);
+  const serviceNames = services.map((s) => s.name);
+
+  const manicuristMatch = findBestMatch(text, manicuristNames, 0.5);
+  const serviceMatch = findBestMatch(text, serviceNames, 0.5);
+
+  let message = "🔄 Entiendo que querés cambiar algo.\n\n";
+
+  if (manicuristMatch.matched && serviceMatch.matched) {
+    message += `Parece que querés cambiar tanto la manicurista como el servicio. ¿Es correcto?\n\n`;
+    message += `Voy a reiniciar el flujo de agendado para que puedas seleccionar nuevamente.`;
+
+    const cleanedData = clearTemporarySessionData(data);
+    await prisma.whatsAppBotSession.update({
+      where: { id: session.id },
+      data: { data: cleanedData, step: "idle" },
+    });
+
+    return {
+      message,
+      nextStep: "idle",
+      shouldEndFlow: true,
+    };
+  }
+
+  if (manicuristMatch.matched) {
+    message += `Querés cambiar la manicurista a: ${manicuristMatch.value}\n\n`;
+    message += `¿Confirmás el cambio?`;
+
+    const updatedData = updateSessionData(data, {
+      manicuristId: manicurists.find((m) => m.user.name === manicuristMatch.value)?.id,
+      manicuristName: manicuristMatch.value as string,
+    });
+
+    await prisma.whatsAppBotSession.update({
+      where: { id: session.id },
+      data: { data: updatedData, step: "service" },
+    });
+
+    return {
+      message,
+      nextStep: "service",
+    };
+  }
+
+  if (serviceMatch.matched) {
+    message += `Querés cambiar el servicio a: ${serviceMatch.value}\n\n`;
+    message += `¿Confirmás el cambio?`;
+
+    const updatedData = updateSessionData(data, {
+      serviceId: services.find((s) => s.name === serviceMatch.value)?.id,
+      serviceName: serviceMatch.value as string,
+    });
+
+    await prisma.whatsAppBotSession.update({
+      where: { id: session.id },
+      data: { data: updatedData, step: "date" },
+    });
+
+    return {
+      message,
+      nextStep: "date",
+    };
+  }
+
+  message += "¿Qué querés cambiar exactamente?\n\n";
+  message += "Escribí 'menú' para volver al inicio.";
+
+  return {
+    message,
+    nextStep: session.step,
+  };
+}
+
+/**
+ * Obtiene el paso anterior del flujo
+ */
+function getPreviousStep(currentStep: BotStep): BotStep {
+  const stepHierarchy: Record<BotStep, number> = {
+    idle: 0,
+    manicurist: 1,
+    service: 2,
+    date: 3,
+    custom_date: 3,
+    slot: 4,
+    consulting: 0,
+    cancelling: 0,
+  };
+
+  const currentLevel = stepHierarchy[currentStep] || 0;
+  const previousLevel = Math.max(0, currentLevel - 1);
+
+  return (
+    Object.entries(stepHierarchy).find(([_, level]) => level === previousLevel)?.[0] as BotStep || "idle"
+  );
 }
 
 // ─── Manejo de Consulta de Disponibilidad ───────────────────────────────
@@ -941,7 +1258,7 @@ async function handleExpiredSession(session: WhatsAppBotSession): Promise<void> 
   const business = await getBusiness(session.businessId);
 
   // Reiniciar la sesión a idle
-  await prisma.whatsappBotSession.update({
+  await prisma.whatsAppBotSession.update({
     where: { id: session.id },
     data: {
       step: "idle",
@@ -953,7 +1270,7 @@ async function handleExpiredSession(session: WhatsAppBotSession): Promise<void> 
   await sendMessage(session.businessId, session.phoneE164, message);
 
   console.log(
-    `[WhatsApp Bot] Session expired for ${session.phoneE164}, reset to idle`
+    `[WhatsApp Bot - Twilio] Session expired for ${session.phoneE164}, reset to idle`
   );
 }
 
@@ -991,7 +1308,7 @@ async function getSessionOrCreate(
 
     return session;
   } catch (error) {
-    console.error("[WhatsApp Bot] Error getting/creating session:", error);
+    console.error("[WhatsApp Bot - Twilio] Error getting/creating session:", error);
     return null;
   }
 }
@@ -1098,11 +1415,10 @@ async function getOrCreateClient(
 
   // Si no existe, crear nuevo cliente
   if (!client) {
-    const lastFourDigits = normalisedPhone.slice(-4);
     client = await prisma.client.create({
       data: {
         businessId,
-        name: `Cliente ${lastFourDigits}`,
+        name: `Cliente ${normalisedPhone.slice(-4)}`,
         phone: normalisedPhone,
       },
       include: {
@@ -1152,7 +1468,7 @@ async function getActiveAppointmentsForClient(
 // ─── Exportaciones ─────────────────────────────────────────────────────────────
 
 export {
-  handleWhatsAppMessage,
+  handleTwilioWhatsAppMessage,
   type BotResponse,
-  type BotOptions,
+  type TwilioInboundForm,
 };

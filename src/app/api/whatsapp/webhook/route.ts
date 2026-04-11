@@ -1,12 +1,13 @@
 /**
  * Meta WhatsApp Cloud API webhook endpoint.
  * - GET:  Webhook verification challenge
- * - POST: Incoming message events - saves messages to database
+ * - POST: Incoming message events - saves messages to database and triggers bot
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { saveIncomingMessage } from "@/services/whatsapp-chat.service";
+import { handleWhatsAppMessage } from "@/services/whatsapp-bot.service";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
@@ -79,6 +80,18 @@ export async function POST(req: NextRequest) {
             );
 
             console.log("[Webhook] Message saved from:", from, "to business:", business.name);
+
+            // Trigger WhatsApp bot to process the message
+            try {
+              await handleWhatsAppMessage({
+                businessId: business.id,
+                phoneE164: from,
+                text,
+              });
+            } catch (botError) {
+              console.error("[Webhook] Error processing bot message:", botError);
+              // Don't fail the webhook response if bot fails
+            }
           }
         }
       }
