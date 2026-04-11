@@ -53,7 +53,7 @@ function validateTwilioSignature(
 /**
  * Obtiene el token de autenticación para validación de firma
  */
-export function getAuthTokenForTwilioWebhook(business: {
+function getAuthTokenForTwilioWebhook(business: {
   twilioAuthToken: string | null;
 }): string {
   return business.twilioAuthToken || process.env.TWILIO_AUTH_TOKEN || "";
@@ -180,7 +180,7 @@ export async function POST(req: NextRequest) {
 /**
  * Resuelve el negocio para mensajes entrantes de Twilio
  */
-export async function resolveBusinessForTwilioInbound(params: {
+async function resolveBusinessForTwilioInbound(params: {
   toRaw: string;
   accountSid?: string;
 }) {
@@ -261,4 +261,3 @@ function normalisePhone(raw: string): string {
 
 // ─── Exportaciones ─────────────────────────────────────────────────────────────
 
-export type { TwilioInboundForm };
