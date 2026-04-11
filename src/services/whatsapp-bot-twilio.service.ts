@@ -1018,7 +1018,7 @@ async function goToPreviousStep(
   session: WhatsAppBotSession,
   data: BotSessionData
 ): Promise<BotResponse> {
-  const previousStep = getPreviousStep(session.step);
+  const previousStep = getPreviousStep(session.step as BotStep);
 
   await prisma.whatsAppBotSession.update({
     where: { id: session.id },
