@@ -150,7 +150,7 @@ const TIME_PATTERNS = [
 /**
  * Normaliza el texto para análisis
  */
-export function normalizeForAnalysis(text: string): string {
+function normalizeForAnalysis(text: string): string {
   return text
     .toLowerCase()
     .trim()
@@ -167,7 +167,7 @@ export function normalizeForAnalysis(text: string): string {
 /**
  * Calcula la similitud entre dos textos (Levenshtein distance)
  */
-export function calculateSimilarity(text1: string, text2: string): number {
+function calculateSimilarity(text1: string, text2: string): number {
   const normalized1 = normalizeForAnalysis(text1);
   const normalized2 = normalizeForAnalysis(text2);
 
@@ -216,7 +216,7 @@ function levenshteinDistance(str1: string, str2: string): number {
 /**
  * Busca la mejor coincidencia en una lista de opciones
  */
-export function findBestMatch(
+function findBestMatch(
   query: string,
   options: string[],
   threshold: number = 0.7
@@ -245,7 +245,7 @@ export function findBestMatch(
 /**
  * Busca múltiples coincidencias en una lista de opciones
  */
-export function findAllMatches(
+function findAllMatches(
   query: string,
   options: string[],
   threshold: number = 0.6
@@ -270,7 +270,7 @@ export function findAllMatches(
 /**
  * Detecta la intención principal del texto
  */
-export function detectIntent(text: string): NLPIntent {
+function detectIntent(text: string): NLPIntent {
   const normalized = normalizeForAnalysis(text);
   const words = normalized.split(/\s+/);
 
@@ -315,7 +315,7 @@ export function detectIntent(text: string): NLPIntent {
 /**
  * Extrae entidades del texto (fechas, horas, números, etc.)
  */
-export function extractEntities(text: string): NLPEntities {
+function extractEntities(text: string): NLPEntities {
   const entities: NLPEntities = {};
 
   // Extraer fechas
@@ -341,7 +341,7 @@ export function extractEntities(text: string): NLPEntities {
 /**
  * Extrae fechas del texto
  */
-export function extractDates(text: string): Date[] {
+function extractDates(text: string): Date[] {
   const dates: Date[] = [];
   const now = toCanaryTimezone(new Date());
 
@@ -458,7 +458,7 @@ export function extractDates(text: string): Date[] {
 /**
  * Extrae horas del texto
  */
-export function extractTimes(text: string): string[] {
+function extractTimes(text: string): string[] {
   const times: string[] = [];
 
   for (const pattern of TIME_PATTERNS) {
@@ -521,7 +521,7 @@ export function extractTimes(text: string): string[] {
 /**
  * Extrae números del texto
  */
-export function extractNumbers(text: string): number[] {
+function extractNumbers(text: string): number[] {
   const numbers: number[] = [];
   const matches = text.match(/\b(\d+)\b/g);
 
@@ -540,7 +540,7 @@ export function extractNumbers(text: string): number[] {
 /**
  * Extrae posibles nombres de manicurista del texto
  */
-export function extractNames(text: string): string[] {
+function extractNames(text: string): string[] {
   const words = text.split(/\s+/);
   const names: string[] = [];
 
@@ -555,7 +555,7 @@ export function extractNames(text: string): string[] {
 /**
  * Extrae palabras clave de servicio del texto
  */
-export function extractServiceKeywords(text: string): string[] {
+function extractServiceKeywords(text: string): string[] {
   const keywords: string[] = [];
 
   const serviceKeywords = [
@@ -581,7 +581,7 @@ export function extractServiceKeywords(text: string): string[] {
 /**
  * Analiza una selección del usuario contra opciones disponibles
  */
-export function analyzeSelection(
+function analyzeSelection(
   userInput: string,
   availableOptions: Array<{ name: string; id: string; index: number }>,
   threshold: number = 0.6
@@ -637,7 +637,7 @@ export interface ConversationContext {
 /**
  * Analiza el contexto de la conversación
  */
-export function analyzeConversationContext(
+function analyzeConversationContext(
   currentInput: string,
   previousIntent?: NLPIntent,
   previousEntities?: NLPEntities
@@ -664,7 +664,7 @@ export function analyzeConversationContext(
 /**
  * Genera preguntas de aclaración
  */
-export function generateClarificationQuestion(
+function generateClarificationQuestion(
   missingEntities: string[],
   context: ConversationContext
 ): string {
@@ -700,7 +700,7 @@ export function generateClarificationQuestion(
 /**
  * Procesa frases complejas con múltiples entidades
  */
-export function processComplexQuery(
+function processComplexQuery(
   text: string,
   availableOptions: {
     manicurists: string[];
