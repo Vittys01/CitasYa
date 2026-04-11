@@ -54,11 +54,11 @@ import {
   formatErrorWithHelp,
 } from "@/lib/bot-messages";
 import type {
-  WhatsAppBotSession,
   ManicuristWithUser,
   Service,
   AppointmentWithRelations,
 } from "@/types";
+import type { WhatsAppBotSession } from "@prisma/client";
 import {
   BotStep,
   BotCommand,
