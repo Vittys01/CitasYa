@@ -95,6 +95,7 @@ import {
   detectIntent,
   extractDates,
   extractTimes,
+  extractEntities,
   analyzeSelection,
   processComplexQuery,
   type NLPIntent,
@@ -210,7 +211,7 @@ async function processMessage(
 
   // Si no hay comando y estamos en idle, mostrar menú
   if (session.step === "idle" && !command) {
-    return await handleIdleState(session, sessionData);
+    return await handleIdleState(session, sessionData, text);
   }
 
   // Procesar según el estado actual del flujo
@@ -326,7 +327,8 @@ async function processFlowStep(
 
 async function handleIdleState(
   session: WhatsAppBotSession,
-  data: BotSessionData
+  data: BotSessionData,
+  text: string
 ): Promise<BotResponse> {
   const business = await getBusiness(session.businessId);
   if (!business) {
@@ -349,6 +351,23 @@ async function handleIdleState(
     where: { id: session.id },
     data: { data: updatedData },
   });
+
+  // Detectar intención de agendado en lenguaje natural
+  const intent = detectIntent(text); // Note: 'text' is not available here, need to pass it
+
+  // Si hay intención de agendar y se detectaron entidades, iniciar el flujo
+  if (intent.type === "booking") {
+    const entities = extractEntities(text);
+    const hasBookingEntities =
+      (entities.dates && entities.dates.length > 0) ||
+      (entities.manicurists && entities.manicurists.length > 0) ||
+      (entities.services && entities.services.length > 0) ||
+      (entities.times && entities.times.length > 0);
+
+    if (hasBookingEntities) {
+      return await startBookingFlowWithEntities(session, updatedData, entities);
+    }
+  }
 
   // Generar mensaje de bienvenida apropiado
   const message = client.appointments.length === 0
@@ -387,6 +406,98 @@ async function startBookingFlow(
     message: `${buildBookingIntro()}\n\n${buildManicuristSelectionMessage({
       manicurists,
     })}`,
+    nextStep: "manicurist",
+  };
+}
+
+async function startBookingFlowWithEntities(
+  session: WhatsAppBotSession,
+  data: BotSessionData,
+  entities: NLPEntities
+): Promise<BotResponse> {
+  const manicurists = await getAvailableManicurists(session.businessId);
+  const services = await getAvailableServices(session.businessId);
+
+  if (manicurists.length === 0) {
+    return {
+      message: buildNoManicuristsMessage(),
+      nextStep: "idle",
+    };
+  }
+
+  const updatedData = clearTemporarySessionData(data);
+
+  // Intentar prellenar manicurista si se detectó
+  if (entities.manicurists && entities.manicurists.length > 0) {
+    const manicuristNames = manicurists.map((m) => m.user.name);
+    const bestMatch = findBestMatch(entities.manicurists[0], manicuristNames, 0.6);
+
+    if (bestMatch.matched) {
+      const selected = manicurists.find((m) => m.user.name === bestMatch.value);
+      if (selected) {
+        updatedData.manicuristId = selected.id;
+        updatedData.manicuristName = selected.user.name;
+      }
+    }
+  }
+
+  // Intentar prellenar servicio si se detectó
+  if (entities.services && entities.services.length > 0) {
+    const serviceNames = services.map((s) => s.name);
+    const bestMatch = findBestMatch(entities.services[0], serviceNames, 0.6);
+
+    if (bestMatch.matched) {
+      const selected = services.find((s) => s.name === bestMatch.value);
+      if (selected) {
+        updatedData.serviceId = selected.id;
+        updatedData.serviceName = selected.name;
+        updatedData.serviceDuration = selected.duration;
+      }
+    }
+  }
+
+  // Intentar prellenar fecha si se detectó
+  if (entities.dates && entities.dates.length > 0) {
+    const selectedDate = entities.dates[0];
+    if (isValidFutureDate(selectedDate)) {
+      updatedData.selectedDate = selectedDate.toISOString();
+    }
+  }
+
+  // Actualizar sesión con los datos prellenados
+  await prisma.whatsAppBotSession.update({
+    where: { id: session.id },
+    data: { data: updatedData },
+  });
+
+  // Determinar el siguiente paso basado en qué ya tenemos
+  if (updatedData.manicuristId && updatedData.serviceId && updatedData.selectedDate) {
+    // Tenemos todo, mostrar horarios disponibles
+    const date = parseISO(updatedData.selectedDate);
+    if (updatedData.serviceDuration) {
+      return await showAvailableSlots(session, updatedData, date);
+    }
+  }
+
+  if (updatedData.manicuristId && updatedData.serviceId) {
+    // Tenemos manicurista y servicio, pedir fecha
+    return {
+      message: `${buildServiceConfirmedMessage(updatedData.serviceName!, updatedData.serviceDuration!)}\n\n${buildDateSelectionMessage()}`,
+      nextStep: "date",
+    };
+  }
+
+  if (updatedData.manicuristId) {
+    // Solo tenemos manicurista, mostrar servicios
+    return {
+      message: `${buildManicuristConfirmedMessage(updatedData.manicuristName!)}\n\n${buildServiceSelectionMessage({ services })}`,
+      nextStep: "service",
+    };
+  }
+
+  // No tenemos nada prellenado, iniciar desde el principio
+  return {
+    message: `${buildBookingIntro()}\n\n${buildManicuristSelectionMessage({ manicurists })}`,
     nextStep: "manicurist",
   };
 }
