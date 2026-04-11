@@ -776,8 +776,4 @@ export {
   analyzeConversationContext,
   generateClarificationQuestion,
   processComplexQuery,
-  type NLPIntent,
-  type NLPEntities,
-  type NLPMatchResult,
-  type ConversationContext,
 };
