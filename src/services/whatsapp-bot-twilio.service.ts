@@ -1469,6 +1469,4 @@ async function getActiveAppointmentsForClient(
 
 export {
   handleTwilioWhatsAppMessage,
-  type BotResponse,
-  type TwilioInboundForm,
 };
