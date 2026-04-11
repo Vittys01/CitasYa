@@ -201,32 +201,42 @@ async function processMessage(
   const sessionData = (session.data as BotSessionData) || createEmptySessionData();
   const normalizedText = normalizeInputText(text);
 
+  console.log("[WhatsApp Bot - Twilio] ProcessMessage - Step:", session.step, "Text:", text);
+
   // Detectar comandos globales
   const command = detectCommand(normalizedText);
+  console.log("[WhatsApp Bot - Twilio] Detected command:", command);
 
   // Si hay comando global y se puede procesar en este estado
   if (command && canProcessGlobalCommand(session.step as BotStep)) {
+    console.log("[WhatsApp Bot - Twilio] Processing as command");
     return await processCommand(session, command, text, sessionData);
   }
 
   // Detectar intención de NLP
   const intent = detectIntent(text);
+  console.log("[WhatsApp Bot - Twilio] Detected intent:", intent.type, "confidence:", intent.confidence);
+  console.log("[WhatsApp Bot - Twilio] Entities:", JSON.stringify(intent.entities));
 
   // Manejar intenciones específicas en cualquier estado
   if (intent.type === "service_inquiry" && session.step === "idle") {
+    console.log("[WhatsApp Bot - Twilio] Handling service inquiry");
     return await handleServiceInquiry(session, sessionData);
   }
 
   if (intent.type === "manicurist_inquiry" && session.step === "idle") {
+    console.log("[WhatsApp Bot - Twilio] Handling manicurist inquiry");
     return await handleManicuristInquiry(session, sessionData);
   }
 
   // Si no hay comando y estamos en idle, mostrar menú
   if (session.step === "idle" && !command) {
+    console.log("[WhatsApp Bot - Twilio] In idle state, handling");
     return await handleIdleState(session, sessionData, text);
   }
 
   // Procesar según el estado actual del flujo
+  console.log("[WhatsApp Bot - Twilio] Processing flow step:", session.step);
   return await processFlowStep(session, text, sessionData, command);
 }
 
@@ -348,6 +358,8 @@ async function handleIdleState(
   data: BotSessionData,
   text: string
 ): Promise<BotResponse> {
+  console.log("[WhatsApp Bot - Twilio] HandleIdleState - Text:", text);
+
   const business = await getBusiness(session.businessId);
   if (!business) {
     return {
@@ -371,11 +383,13 @@ async function handleIdleState(
   });
 
   // Detectar intención de agendado en lenguaje natural
-  const intent = detectIntent(text); // Note: 'text' is not available here, need to pass it
+  const intent = detectIntent(text);
+  console.log("[WhatsApp Bot - Twilio] Detected intent in idle:", intent.type, "confidence:", intent.confidence);
 
   // Si hay intención de agendar y se detectaron entidades, iniciar el flujo
   if (intent.type === "booking") {
     const entities = extractEntities(text);
+    console.log("[WhatsApp Bot - Twilio] Extracted entities:", JSON.stringify(entities));
     const hasBookingEntities =
       (entities.dates && entities.dates.length > 0) ||
       (entities.manicurists && entities.manicurists.length > 0) ||
@@ -383,6 +397,7 @@ async function handleIdleState(
       (entities.times && entities.times.length > 0);
 
     if (hasBookingEntities) {
+      console.log("[WhatsApp Bot - Twilio] Has booking entities, starting booking flow with entities");
       return await startBookingFlowWithEntities(session, updatedData, entities);
     }
   }
