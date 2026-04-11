@@ -655,7 +655,7 @@ function analyzeConversationContext(
 
   // Si hay cambios o modificaciones, mantener contexto previo
   if (currentIntent.type === "change" && previousIntent) {
-    context.lastIntent = previousIntent;
+    context.lastIntent = previousIntent.type;
   }
 
   return context;
