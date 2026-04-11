@@ -484,7 +484,7 @@ async function handleDateSelection(
           selectedDate: undefined,
           customDateInput: "",
         });
-        await prisma.whatsappBotSession.update({
+        await prisma.whatsAppBotSession.update({
           where: { id: session.id },
           data: { data: updatedData },
         });
@@ -794,7 +794,7 @@ async function handleCancellation(
   });
 
   const cleanedData = clearTemporarySessionData(data);
-  await prisma.whatsappBotSession.update({
+  await prisma.whatsAppBotSession.update({
     where: { id: session.id },
     data: { data: cleanedData, step: "idle" },
   });
@@ -821,7 +821,7 @@ async function handleCancelSpecificAppointment(
       clientName: client.name,
     });
 
-    await prisma.whatsappBotSession.update({
+    await prisma.whatsAppBotSession.update({
       where: { id: session.id },
       data: { data: updatedData },
     });
@@ -854,7 +854,7 @@ async function handleCancelSpecificAppointment(
   });
 
   const cleanedData = clearTemporarySessionData(updatedData);
-  await prisma.whatsappBotSession.update({
+  await prisma.whatsAppBotSession.update({
     where: { id: session.id },
     data: { data: cleanedData, step: "idle" },
   });
@@ -941,7 +941,7 @@ async function handleExpiredSession(session: WhatsAppBotSession): Promise<void> 
   const business = await getBusiness(session.businessId);
 
   // Reiniciar la sesión a idle
-  await prisma.whatsappBotSession.update({
+  await prisma.whatsAppBotSession.update({
     where: { id: session.id },
     data: {
       step: "idle",
