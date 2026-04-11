@@ -48,6 +48,9 @@ export interface BotSessionData {
   // Metadatos
   businessId?: string;
   phoneE164?: string;
+
+  // Index signature para compatibilidad con Prisma JsonValue
+  [key: string]: any;
 }
 
 // ─── Parseo de Comandos ─────────────────────────────────────────────────────────
