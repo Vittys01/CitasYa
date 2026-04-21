@@ -180,6 +180,10 @@ export default function NewAppointmentButton({
   const [loadingSlots, setLoadingSlots] = useState(false);
   /** Si está definido, se buscan turnos de este día; si no, se usan "próximos" */
   const [pickerDate, setPickerDate] = useState<string>("");
+  /** Modo de ingreso de hora: 'slots' (default) o 'manual' */
+  const [timeEntryMode, setTimeEntryMode] = useState<"slots" | "manual">("slots");
+  const [manualHour, setManualHour] = useState("");
+  const [manualMinute, setManualMinute] = useState("");
 
   const loadSlotsNext = useCallback(
     async (serviceId: string, duration: number, manicuristId: string, signal: AbortSignal) => {
@@ -326,6 +330,9 @@ export default function NewAppointmentButton({
     setNewClient({ name: "", phone: "", email: "", notes: "" });
     setNewClientError("");
     setSendWhatsApp(true);
+    setTimeEntryMode("slots");
+    setManualHour("");
+    setManualMinute("");
     if (!isControlled) setInternalOpen(true);
   }
 
@@ -420,7 +427,22 @@ export default function NewAppointmentButton({
   // ── Submit ──────────────────────────────────────────────────────────────────
   async function onSubmit(data: FormData) {
     setError(null);
-    if (!data.startAt || !data.manicuristId || !data.clientId || selectedServices.length === 0) {
+    let finalStartAt = data.startAt;
+    if (timeEntryMode === "manual") {
+      if (!pickerDate) {
+        setError(g(settings, "validation.fillAll", "Seleccioná una fecha para usar hora manual."));
+        return;
+      }
+      const hour = parseInt(manualHour, 10);
+      const minute = parseInt(manualMinute, 10);
+      if (isNaN(hour) || isNaN(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+        setError(g(settings, "validation.fillAll", "Ingresá una hora y minutos válidos."));
+        return;
+      }
+      const dateStr = pickerDate;
+      finalStartAt = new Date(`${dateStr}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00`).toISOString();
+    }
+    if (!finalStartAt || !data.manicuristId || !data.clientId || selectedServices.length === 0) {
       setError(g(settings, "validation.fillAll", "Completá cliente, al menos un servicio y horario."));
       return;
     }
@@ -448,7 +470,7 @@ export default function NewAppointmentButton({
         clientId: data.clientId,
         manicuristId: data.manicuristId,
         services: servicesPayload,
-        startAt: new Date(data.startAt).toISOString(),
+        startAt: new Date(finalStartAt).toISOString(),
         notes: data.notes,
         price: priceForSubmit,
         totalDurationMinutes: effectiveSlotDuration,
@@ -1000,10 +1022,10 @@ export default function NewAppointmentButton({
                         : g(settings, "form.field.nextSlots", "Próximos turnos disponibles")}
                     </label>
                     <select
-                      value={watch("startAt") ?? ""}
+                      value={timeEntryMode === "slots" ? watch("startAt") ?? "" : ""}
                       onChange={(e) => handleSlotChange(e.target.value)}
-                      disabled={selectedServices.length === 0 || loadingSlots}
-                      className={cn(inputCls, (selectedServices.length === 0 || loadingSlots) && "opacity-60 cursor-not-allowed")}
+                      disabled={selectedServices.length === 0 || loadingSlots || timeEntryMode !== "slots"}
+                      className={cn(inputCls, (selectedServices.length === 0 || loadingSlots || timeEntryMode !== "slots") && "opacity-60 cursor-not-allowed")}
                     >
                       <option value="">
                         {selectedServices.length === 0
@@ -1020,6 +1042,63 @@ export default function NewAppointmentButton({
                     </select>
                     {errors.startAt && <p className="text-red-500 text-xs mt-1">{g(settings, "validation.selectDateTime", "Seleccioná fecha y hora")}</p>}
                   </div>
+                  {/* Toggle modo de ingreso de hora */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setTimeEntryMode("slots")}
+                      className={cn(
+                        "px-3 py-1.5 text-xs font-medium rounded-lg transition",
+                        timeEntryMode === "slots"
+                          ? "bg-primary-dark text-white"
+                          : "bg-[#e6d5c3] text-earth hover:bg-[#d7ccc8]"
+                      )}
+                    >
+                      Turnos disponibles
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTimeEntryMode("manual")}
+                      className={cn(
+                        "px-3 py-1.5 text-xs font-medium rounded-lg transition",
+                        timeEntryMode === "manual"
+                          ? "bg-primary-dark text-white"
+                          : "bg-[#e6d5c3] text-earth hover:bg-[#d7ccc8]"
+                      )}
+                    >
+                      Elegir hora
+                    </button>
+                  </div>
+                  {/* Hora manual */}
+                  {timeEntryMode === "manual" && (
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1">
+                        <label className={labelCls}>Hora</label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={23}
+                          value={manualHour}
+                          onChange={(e) => setManualHour(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                          placeholder="00"
+                          className={inputCls}
+                        />
+                      </div>
+                      <span className="text-earth font-medium mt-5">:</span>
+                      <div className="flex-1">
+                        <label className={labelCls}>Minutos</label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={59}
+                          value={manualMinute}
+                          onChange={(e) => setManualMinute(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                          placeholder="00"
+                          className={inputCls}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
