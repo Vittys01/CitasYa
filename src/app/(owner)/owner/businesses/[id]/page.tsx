@@ -5,7 +5,7 @@ import Link from "next/link";
 import DeleteBusinessButton from "@/components/owner/DeleteBusinessButton";
 import { CURRENCIES } from "@/lib/format-price";
 import { getAppSettings } from "@/services/settings.service";
-import { formatMonthYear, formatDate } from "@/lib/utils";
+import { formatMonthYear, formatDate, now } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -34,9 +34,9 @@ export default async function BusinessDetailPage({
   const session = await auth();
   const ownerId = session!.user.id;
 
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+  const currentTime = now();
+  const monthStart = new Date(currentTime.getFullYear(), currentTime.getMonth(), 1);
+  const monthEnd = new Date(currentTime.getFullYear(), currentTime.getMonth() + 1, 0, 23, 59, 59);
 
   const [business, totalRev, monthRev, settings] = await Promise.all([
     prisma.business.findFirst({
@@ -82,7 +82,7 @@ export default async function BusinessDetailPage({
 
   const totalRevenue = Number(totalRev._sum.price ?? 0);
   const monthRevenue = Number(monthRev._sum.price ?? 0);
-  const currentMonthLabel = formatMonthYear(now);
+  const currentMonthLabel = formatMonthYear(currentTime);
   const currencyCode = settings["app.currency"] ?? "ARS";
   const currencyCfg = CURRENCIES[currencyCode] ?? CURRENCIES["ARS"];
 

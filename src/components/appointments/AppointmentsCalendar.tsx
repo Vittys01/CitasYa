@@ -18,7 +18,7 @@ import {
   setMinutes,
 } from "date-fns";
 import { es } from "date-fns/locale";
-import { cn, SCHEDULE_SLOT_MINUTES, formatDateShort, formatHour, toCanaryTimezone } from "@/lib/utils";
+import { cn, SCHEDULE_SLOT_MINUTES, formatDateShort, formatHour, now, toCanaryTimezone } from "@/lib/utils";
 import { formatPrice } from "@/lib/format-price";
 import type { Manicurist, Client, Schedule } from "@prisma/client";
 import type { ServiceForClient, AppointmentForClient } from "@/lib/serialize";
@@ -175,10 +175,10 @@ export default function AppointmentsCalendar({
   type StatusFilter = "all" | "PENDING" | "CONFIRMED" | "COMPLETED" | "CANCELLED";
 
   const [view, setView]           = useState<"month" | "week" | "day">("month");
-  const [selectedDay, setSelectedDay] = useState(new Date());
-  const [monthCursor, setMonthCursor] = useState(() => startOfMonth(new Date()));
+  const [selectedDay, setSelectedDay] = useState(() => now());
+  const [monthCursor, setMonthCursor] = useState(() => startOfMonth(now()));
   const [weekStart, setWeekStart]  = useState(() =>
-    startOfWeek(new Date(), { weekStartsOn: 1 })
+    startOfWeek(now(), { weekStartsOn: 1 })
   );
   const [filterMani, setFilterMani] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<StatusFilter>("all");
@@ -353,7 +353,7 @@ export default function AppointmentsCalendar({
   );
 
   const goToToday = useCallback(() => {
-    const today = new Date();
+    const today = now();
     setSelectedDay(today);
     setWeekStart(startOfWeek(today, { weekStartsOn: 1 }));
     setMonthCursor(startOfMonth(today));
@@ -773,7 +773,7 @@ export default function AppointmentsCalendar({
             </div>
             <div className="grid grid-cols-7 gap-px rounded-b-lg border border-[#e6d5c3] bg-[#e6d5c3]">
               {monthCalendarDays.map((day) => {
-                const isToday = isSameDay(day, new Date());
+                const isToday = isSameDay(day, now());
                 const inMonth = isSameMonth(day, monthCursor);
                 const dayAppts = filtered
                   .filter((a) => isSameDay(toCanaryTimezone(new Date(a.startAt)), day))
@@ -931,7 +931,7 @@ export default function AppointmentsCalendar({
             <div className="border-r border-[#e6d5c3]" />
             {view === "week" &&
               viewDays.map((day) => {
-                const isToday = isSameDay(day, new Date());
+                const isToday = isSameDay(day, now());
                 return (
                   <button
                     key={day.toISOString()}
@@ -1355,8 +1355,8 @@ function CurrentTimeLine({ gridStartHour, pxPerHour }: { gridStartHour: number; 
 
   if (!mounted) return null;
 
-  const now      = new Date();
-  const topPixel = ((now.getHours() - gridStartHour) * 60 + now.getMinutes()) / 60 * pxPerHour;
+  const currentTime = now();
+  const topPixel = ((currentTime.getHours() - gridStartHour) * 60 + currentTime.getMinutes()) / 60 * pxPerHour;
 
   if (topPixel < 0 || topPixel > (GRID_HOURS * pxPerHour)) return null;
 
@@ -1367,7 +1367,7 @@ function CurrentTimeLine({ gridStartHour, pxPerHour }: { gridStartHour: number; 
     >
       <div className="w-16 text-right pr-2">
         <span className="text-[10px] font-bold text-primary-dark bg-[#FFFDF5] px-1">
-          {format(now, "HH:mm")}
+          {format(now(), "HH:mm")}
         </span>
       </div>
       <div className="flex-1 h-px bg-primary-dark relative">

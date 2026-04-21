@@ -5,7 +5,7 @@
  */
 
 import type { ManicuristWithUser, Service, AppointmentWithRelations } from "@/types";
-import { formatDate, formatTime, toCanaryTimezone } from "./utils";
+import { formatDate, formatTime, now, toCanaryTimezone } from "./utils";
 
 // ─── Tipos ──────────────────────────────────────────────────────────────────────
 
@@ -123,7 +123,7 @@ export function buildServiceConfirmedMessage(serviceName: string, duration: numb
 }
 
 export function buildDateSelectionMessage(): string {
-  const today = new Date();
+  const today = now();
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
 

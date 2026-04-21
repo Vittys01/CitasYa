@@ -5,6 +5,7 @@
 
 import { prisma } from "@/lib/db";
 import { getWhatsAppProvider } from "@/lib/whatsapp";
+import { now } from "@/lib/utils";
 import type { Direction, MessageStatus } from "@prisma/client";
 
 export interface WhatsAppMessage {
@@ -156,7 +157,7 @@ export async function getConversation(
           ? `https://www.gravatar.com/avatar/${Buffer.from(client.email.trim().toLowerCase()).toString("hex")}?d=retro`
           : undefined,
         lastMessage: "",
-        lastMessageTime: new Date(),
+        lastMessageTime: now(),
         messageCount: 0,
       }
     : undefined;

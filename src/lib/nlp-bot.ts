@@ -7,7 +7,7 @@
 
 import { addDays, format, parse, isValid, startOfDay, endOfDay, differenceInDays, differenceInHours, isSameDay } from "date-fns";
 import { es } from "date-fns/locale";
-import { toCanaryTimezone } from "./utils";
+import { now } from "./utils";
 
 // ─── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -357,7 +357,7 @@ function extractEntities(text: string): NLPEntities {
  */
 function extractDates(text: string): Date[] {
   const dates: Date[] = [];
-  const now = toCanaryTimezone(new Date());
+  const currentTime = now();
 
   for (const pattern of DATE_PATTERNS) {
     const match = text.match(pattern.pattern);
@@ -367,43 +367,43 @@ function extractDates(text: string): Date[] {
 
     switch (pattern.type) {
       case "today":
-        date = new Date(now);
+        date = new Date(currentTime);
         break;
 
       case "tomorrow":
-        date = addDays(now, 1);
+        date = addDays(currentTime, 1);
         break;
 
       case "after_tomorrow":
-        date = addDays(now, 2);
+        date = addDays(currentTime, 2);
         break;
 
       case "this_week":
-        date = addDays(now, 0);
+        date = addDays(currentTime, 0);
         break;
 
       case "next_week":
-        date = addDays(now, 7);
+        date = addDays(currentTime, 7);
         break;
 
       case "this_month":
-        date = addDays(now, 0);
+        date = addDays(currentTime, 0);
         break;
 
       case "next_month":
-        const nextMonth = new Date(now);
+        const nextMonth = new Date(currentTime);
         nextMonth.setMonth(nextMonth.getMonth() + 1);
         date = nextMonth;
         break;
 
       case "weekday":
         const weekday = pattern.value || 0;
-        const targetDay = new Date(now);
+        const targetDay = new Date(currentTime);
         const currentDay = targetDay.getDay();
 
         let daysToAdd = (weekday - currentDay + 7) % 7;
-        if (daysToAdd === 0 && isSameDay(targetDay, now)) {
-          daysToAdd = 7; // Si ya es ese día, usar la próxima semana
+        if (daysToAdd === 0 && isSameDay(targetDay, currentTime)) {
+          daysToAdd = 7;
         }
 
         targetDay.setDate(targetDay.getDate() + daysToAdd);
@@ -416,14 +416,13 @@ function extractDates(text: string): Date[] {
 
           if (!isNaN(day) && !isNaN(month)) {
             const constructedDate = new Date(
-              year || now.getFullYear(),
+              year || currentTime.getFullYear(),
               month - 1,
               day
             );
 
             if (isValid(constructedDate)) {
-              // Si el año es el actual y la fecha ya pasó, usar el próximo año
-              if (!year && constructedDate < now) {
+              if (!year && constructedDate < currentTime) {
                 constructedDate.setFullYear(constructedDate.getFullYear() + 1);
               }
 
@@ -436,31 +435,30 @@ function extractDates(text: string): Date[] {
         break;
 
       case "now":
-        date = new Date(now);
+        date = new Date(currentTime);
         break;
 
       case "afternoon":
-        const afternoon = new Date(now);
+        const afternoon = new Date(currentTime);
         afternoon.setHours(14, 0, 0, 0);
         date = afternoon;
         break;
 
       case "evening":
-        const evening = new Date(now);
+        const evening = new Date(currentTime);
         evening.setHours(20, 0, 0, 0);
         date = evening;
         break;
 
       case "early_morning":
-        const earlyMorning = new Date(now);
+        const earlyMorning = new Date(currentTime);
         earlyMorning.setHours(8, 0, 0, 0);
         date = earlyMorning;
         break;
     }
 
     if (date) {
-      // Validar que sea una fecha futura
-      if (isValid(date) && date >= startOfDay(now)) {
+      if (isValid(date) && date >= startOfDay(currentTime)) {
         dates.push(date);
       }
     }

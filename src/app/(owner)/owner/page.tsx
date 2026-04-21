@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import Link from "next/link";
 import DeleteBusinessButton from "@/components/owner/DeleteBusinessButton";
 import { CURRENCIES } from "@/lib/format-price";
-import { formatMonthYear } from "@/lib/utils";
+import { formatMonthYear, now } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -20,9 +20,9 @@ export default async function OwnerPage() {
   const session = await auth();
   const ownerId = session!.user.id;
 
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+  const currentTime = now();
+  const monthStart = new Date(currentTime.getFullYear(), currentTime.getMonth(), 1);
+  const monthEnd = new Date(currentTime.getFullYear(), currentTime.getMonth() + 1, 0, 23, 59, 59);
 
   const businesses = await prisma.business.findMany({
     where: { ownerId },
@@ -72,7 +72,7 @@ export default async function OwnerPage() {
     allSettings.map((s) => [s.businessId, s.value])
   );
 
-  const currentMonthLabel = formatMonthYear(now);
+  const currentMonthLabel = formatMonthYear(currentTime);
 
   return (
     <div>

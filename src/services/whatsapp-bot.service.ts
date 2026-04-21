@@ -89,7 +89,7 @@ import {
 } from "@/lib/bot-flow";
 import { addDays, format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import { toCanaryTimezone, normalisePhone } from "@/lib/utils";
+import { now, normalisePhone, toCanaryTimezone } from "@/lib/utils";
 
 // ─── Configuración ───────────────────────────────────────────────────────────
 
@@ -433,7 +433,7 @@ async function handleDateSelection(
     };
   }
 
-  const today = toCanaryTimezone(new Date());
+  const today = now();
 
   switch (selection) {
     case 1: // Hoy
@@ -872,7 +872,7 @@ async function handleAvailabilityQuery(
   session: WhatsAppBotSession,
   data: BotSessionData
 ): Promise<BotResponse> {
-  const today = toCanaryTimezone(new Date());
+  const today = now();
   const tomorrow = addDays(today, 1);
   const inTwoDays = addDays(today, 2);
 
@@ -1009,7 +1009,7 @@ async function updateSession(
     where: { id: sessionId },
     data: {
       step: nextStep,
-      updatedAt: new Date(),
+      updatedAt: now(),
     },
   });
 }
@@ -1088,7 +1088,7 @@ async function getOrCreateClient(
       appointments: {
         where: {
           status: { in: ["PENDING", "CONFIRMED"] },
-          startAt: { gte: new Date() },
+          startAt: { gte: now() },
         },
         take: 5,
         orderBy: { startAt: "asc" },
@@ -1109,7 +1109,7 @@ async function getOrCreateClient(
         appointments: {
           where: {
             status: { in: ["PENDING", "CONFIRMED"] },
-            startAt: { gte: new Date() },
+            startAt: { gte: now() },
           },
           take: 5,
           orderBy: { startAt: "asc" },
@@ -1133,7 +1133,7 @@ async function getActiveAppointmentsForClient(
       businessId,
       clientId,
       status: { in: ["PENDING", "CONFIRMED"] },
-      startAt: { gte: new Date() },
+      startAt: { gte: now() },
     },
     include: {
       client: { select: { id: true, name: true, phone: true } },

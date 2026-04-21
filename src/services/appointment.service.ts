@@ -15,6 +15,7 @@ import {
   ceilToNextSlotMinute,
   intervalsOverlap,
   SCHEDULE_SLOT_MINUTES,
+  now,
   toCanaryTimezone,
 } from "@/lib/utils";
 import {
@@ -529,7 +530,7 @@ export async function getNextAvailableSlots(
   limit: number,
   businessId?: string
 ): Promise<{ start: Date; end: Date; manicuristId: string }[]> {
-  const now = new Date();
+  const currentTime = now();
 
   const ids =
     manicuristIds.length > 0
@@ -543,8 +544,8 @@ export async function getNextAvailableSlots(
   const maxDays = 14;
 
   for (let d = 0; d < maxDays; d++) {
-    const date = addDays(now, d);
-    const earliestStart = isSameDay(date, now) ? ceilToNextSlotMinute(now) : undefined;
+    const date = addDays(currentTime, d);
+    const earliestStart = isSameDay(date, currentTime) ? ceilToNextSlotMinute(currentTime) : undefined;
     for (const manicuristId of ids) {
       const daySlots = await getAvailableSlots(manicuristId, date, serviceDuration, earliestStart);
       for (const slot of daySlots) {
@@ -568,7 +569,7 @@ export async function autoCompleteExpiredAppointments(): Promise<number> {
   const result = await prisma.appointment.updateMany({
     where: {
       status: { in: ["PENDING", "CONFIRMED"] },
-      endAt: { lt: new Date() },
+      endAt: { lt: now() },
     },
     data: { status: "COMPLETED" },
   });

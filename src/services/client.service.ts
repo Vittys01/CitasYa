@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { normalisePhone, buildPaginationMeta } from "@/lib/utils";
+import { normalisePhone, buildPaginationMeta, now } from "@/lib/utils";
 import type { CreateClientInput, UpdateClientInput, ClientWithHistory } from "@/types";
 import type { Client } from "@prisma/client";
 
@@ -103,7 +103,7 @@ export async function deleteClient(id: string): Promise<void> {
   const futureAppt = await prisma.appointment.findFirst({
     where: {
       clientId: id,
-      startAt: { gt: new Date() },
+      startAt: { gt: now() },
       status: { in: ["PENDING", "CONFIRMED"] },
     },
   });

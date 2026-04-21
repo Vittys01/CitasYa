@@ -177,11 +177,16 @@ export function formatPhoneNumber(phoneE164: string): string {
   return phoneE164;
 }
 
+/** Current time in Canary Islands timezone */
+export function now(): Date {
+  return toCanaryTimezone(new Date());
+}
+
 /** Format relative time (e.g. "hace 5 min", "ayer") */
 export function formatRelativeTime(date: Date | string): string {
   const dateObj = typeof date === "string" ? new Date(date) : date;
-  const now = new Date();
-  const diffMs = now.getTime() - dateObj.getTime();
+  const currentTime = now();
+  const diffMs = currentTime.getTime() - dateObj.getTime();
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);

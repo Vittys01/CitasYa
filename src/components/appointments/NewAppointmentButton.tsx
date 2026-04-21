@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { ceilToNextSlotMinute, cn, formatDateShort, formatHour } from "@/lib/utils";
+import { ceilToNextSlotMinute, cn, formatDateShort, formatHour, now } from "@/lib/utils";
 import { formatPrice } from "@/lib/format-price";
 import type { Manicurist, Client, Schedule } from "@prisma/client";
 import { appointmentFromApiJson, type ServiceForClient, type AppointmentForClient } from "@/lib/serialize";
@@ -244,8 +244,8 @@ export default function NewAppointmentButton({
           const data = await res.json();
           if (signal.aborted) return;
           let list = (data?.data ?? []) as { start: string; end: string }[];
-          if (dateStr === format(new Date(), "yyyy-MM-dd")) {
-            const notBefore = ceilToNextSlotMinute(new Date());
+          if (dateStr === format(now(), "yyyy-MM-dd")) {
+            const notBefore = ceilToNextSlotMinute(now());
             list = list.filter((s) => new Date(s.start) >= notBefore);
           }
           const man = manicurists.find((m) => m.id === mid);
@@ -954,7 +954,7 @@ export default function NewAppointmentButton({
                       type="date"
                       value={pickerDate}
                       onChange={(e) => setPickerDate(e.target.value)}
-                      min={new Date().toISOString().slice(0, 10)}
+                      min={now().toISOString().slice(0, 10)}
                       className={inputCls}
                     />
                     <p className="text-[10px] text-earth-muted mt-1">

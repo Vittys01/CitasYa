@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { saveIncomingMessage } from "@/services/whatsapp-chat.service";
 import { handleTwilioWhatsAppMessage } from "@/services/whatsapp-bot-twilio.service";
+import { now } from "@/lib/utils";
 import crypto from "crypto";
 
 // ─── Tipos ─────────────────────────────────────────────────────────────────────
@@ -131,7 +132,7 @@ export async function POST(req: NextRequest) {
       {
         provider: "twilio",
         messageId: messageSid,
-        timestamp: form["SmsTimestamp"] || new Date().toISOString(),
+        timestamp: form["SmsTimestamp"] || now().toISOString(),
         from: normalisedFrom,
         to: normalisedTo,
       },

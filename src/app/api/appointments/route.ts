@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { resolveBusinessIdFromSession } from "@/lib/resolve-business-session";
-import { apiError, apiSuccess } from "@/lib/utils";
+import { apiError, apiSuccess, now } from "@/lib/utils";
 import {
   createAppointment,
   getAppointmentsByDate,
@@ -77,7 +77,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(apiSuccess(data));
     }
 
-    const target = date ? new Date(date) : new Date();
+    const target = date ? new Date(date) : now();
     const data = await getAppointmentsByDate(target, options);
     return NextResponse.json(apiSuccess(data));
   } catch (err) {

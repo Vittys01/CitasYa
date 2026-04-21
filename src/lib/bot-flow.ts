@@ -6,6 +6,7 @@
 
 import type { WhatsAppBotSession } from "@prisma/client";
 import type { ManicuristWithUser, Service } from "@/types";
+import { now } from "./utils";
 
 // ─── Tipos de Estados del Flujo ────────────────────────────────────────────────
 
@@ -269,14 +270,14 @@ export function parseCustomDate(text: string): Date | null {
     return null;
   }
 
-  const now = new Date();
-  const year = now.getFullYear();
+  const currentTime = now();
+  const year = currentTime.getFullYear();
 
   // Crear fecha en zona horaria del usuario (simple approximation)
   const date = new Date(year, month - 1, day, 0, 0, 0, 0);
 
   // Si la fecha ya pasó, usar el próximo año
-  if (date < now) {
+  if (date < currentTime) {
     date.setFullYear(year + 1);
   }
 
@@ -287,9 +288,9 @@ export function parseCustomDate(text: string): Date | null {
  * Determina si una fecha es válida (no pasada)
  */
 export function isValidFutureDate(date: Date): boolean {
-  const now = new Date();
+  const currentTime = now();
   // Considerar válida si es hoy o futuro
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const today = new Date(currentTime.getFullYear(), currentTime.getMonth(), currentTime.getDate());
   const inputDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   return inputDate >= today;
 }
@@ -393,9 +394,9 @@ export function hasSessionExpired(
 ): boolean {
   if (!session.updatedAt) return false;
 
-  const now = new Date();
+  const currentTime = now();
   const sessionTime = new Date(session.updatedAt);
-  const elapsedMinutes = (now.getTime() - sessionTime.getTime()) / (1000 * 60);
+  const elapsedMinutes = (currentTime.getTime() - sessionTime.getTime()) / (1000 * 60);
 
   return elapsedMinutes > timeoutMinutes;
 }
@@ -409,9 +410,9 @@ export function getSessionRemainingTime(
 ): number | null {
   if (!session.updatedAt) return null;
 
-  const now = new Date();
+  const currentTime = now();
   const sessionTime = new Date(session.updatedAt);
-  const elapsedMinutes = (now.getTime() - sessionTime.getTime()) / (1000 * 60);
+  const elapsedMinutes = (currentTime.getTime() - sessionTime.getTime()) / (1000 * 60);
   const remaining = timeoutMinutes - elapsedMinutes;
 
   return remaining > 0 ? remaining : 0;

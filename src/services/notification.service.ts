@@ -10,6 +10,7 @@ import {
   buildCancellationTwilioContentVariables,
   type WhatsAppSendResult,
 } from "@/lib/whatsapp";
+import { now } from "@/lib/utils";
 import type { NotificationType } from "@prisma/client";
 
 function twilioContentSidForType(type: NotificationType): string | undefined {
@@ -166,7 +167,7 @@ export async function processNotification(
       status: result.success ? "SENT" : "FAILED",
       externalId: result.externalId,
       error: result.error,
-      sentAt: result.success ? new Date() : null,
+      sentAt: result.success ? now() : null,
     },
   });
 

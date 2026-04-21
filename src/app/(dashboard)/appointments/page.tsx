@@ -5,6 +5,7 @@ import { getAppSettings } from "@/services/settings.service";
 import { serializeServices, serializeAppointmentPrice } from "@/lib/serialize";
 import AppointmentsView from "./AppointmentsView";
 import { startOfWeek } from "date-fns";
+import { now } from "@/lib/utils";
 
 /** Evita caché RSC: tras crear un turno, `router.refresh()` debe traer datos nuevos. */
 export const dynamic = "force-dynamic";
@@ -15,7 +16,7 @@ export default async function AppointmentsPage() {
   const isManicurist = session?.user.role === "MANICURIST";
   const manicuristId = session?.user.manicuristId ?? undefined;
 
-  const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+  const weekStart = startOfWeek(now(), { weekStartsOn: 1 });
   const initialWeekStartKey = weekStart.toISOString().slice(0, 10); // YYYY-MM-DD
 
   const [settings, appointments, allManicurists, services, clients] = await Promise.all([

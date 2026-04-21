@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { now } from "@/lib/utils";
 import type { DashboardStats, ManicuristProductivity } from "@/types";
 
 export async function getDashboardStats(
@@ -6,7 +7,7 @@ export async function getDashboardStats(
   to: Date,
   options?: { businessId?: string; manicuristId?: string }
 ): Promise<DashboardStats> {
-  const today = new Date();
+  const today = now();
   today.setHours(0, 0, 0, 0);
   const todayEnd = new Date(today);
   todayEnd.setHours(23, 59, 59, 999);

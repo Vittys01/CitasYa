@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { apiError, apiSuccess } from "@/lib/utils";
+import { apiError, apiSuccess, now } from "@/lib/utils";
 import { getDashboardStats, getManicuristProductivity } from "@/services/dashboard.service";
 
 export async function GET(req: NextRequest) {
@@ -16,11 +16,11 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = req.nextUrl;
 
-  const now = new Date();
-  const defaultFrom = new Date(now.getFullYear(), now.getMonth(), 1);
+  const currentTime = now();
+  const defaultFrom = new Date(currentTime.getFullYear(), currentTime.getMonth(), 1);
 
   const from = new Date(searchParams.get("from") ?? defaultFrom.toISOString());
-  const to = new Date(searchParams.get("to") ?? now.toISOString());
+  const to = new Date(searchParams.get("to") ?? currentTime.toISOString());
 
   // Restricciones para manicuristas: solo ver sus propias estadísticas
   const isManicurist = session.user.role === "MANICURIST";

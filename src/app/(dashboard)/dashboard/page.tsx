@@ -4,7 +4,7 @@ import { getDashboardStats, getManicuristProductivity } from "@/services/dashboa
 import { getAppointmentsByDate } from "@/services/appointment.service";
 import { getAppSettings } from "@/services/settings.service";
 import { serializeAppointmentPrice } from "@/lib/serialize";
-import { formatDate } from "@/lib/utils";
+import { formatDate, now } from "@/lib/utils";
 import StatsCards from "@/components/dashboard/StatsCards";
 import ProductivityChart from "@/components/dashboard/ProductivityChart";
 import TodayAppointments from "@/components/dashboard/TodayAppointments";
@@ -16,16 +16,16 @@ export default async function DashboardPage() {
   const isManicurist = session?.user.role === "MANICURIST";
   const manicuristId = session?.user.manicuristId ?? undefined;
 
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const currentTime = now();
+  const monthStart = new Date(currentTime.getFullYear(), currentTime.getMonth(), 1);
 
   const [settings, stats, productivity, todayAppts] = await Promise.all([
     getAppSettings(businessId),
-    getDashboardStats(monthStart, now, { businessId, manicuristId: isManicurist ? manicuristId : undefined }),
+    getDashboardStats(monthStart, currentTime, { businessId, manicuristId: isManicurist ? manicuristId : undefined }),
     isManicurist
       ? Promise.resolve([])
-      : getManicuristProductivity(monthStart, now),
-    getAppointmentsByDate(now, { businessId, manicuristId: isManicurist ? manicuristId : undefined }),
+      : getManicuristProductivity(monthStart, currentTime),
+    getAppointmentsByDate(currentTime, { businessId, manicuristId: isManicurist ? manicuristId : undefined }),
   ]);
 
   const todayApptsForClient = todayAppts.map(serializeAppointmentPrice);
@@ -35,7 +35,7 @@ export default async function DashboardPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">{settings["nav.dashboard"] ?? "Dashboard"}</h1>
         <p className="text-gray-500 text-sm mt-1">
-          {settings["dashboard.welcome"] ?? "Bienvenida"}, {session?.user.name} · {formatDate(now)}
+          {settings["dashboard.welcome"] ?? "Bienvenida"}, {session?.user.name} · {formatDate(currentTime)}
         </p>
       </div>
 
