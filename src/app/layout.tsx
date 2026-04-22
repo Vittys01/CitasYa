@@ -7,7 +7,7 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Dates — Gestión de Turnos",
-  description: "Sistema SaaS de gestión de citas para manicuristas",
+  description: "Sistema SAAS de gestión de citas para manicuristas",
 };
 
 /** Fuerza ancho de viewport real en móvil (Safari/iOS); sin esto la página puede verse “de escritorio”. */
