@@ -569,7 +569,7 @@ function extractServiceKeywords(text: string): string[] {
   const keywords: string[] = [];
 
   const serviceKeywords = [
-    "manicura", "uñas", "esculpidas", "gel", "acrilico",
+    "manicura", "uñas", "esculpidas", "gel", "acrilico", "semipermanente",
     "diseño", "arte", "decoración", "french", "spañish",
     "pedicura", "pies", "calzado", "spa", "masaje",
     "tratamiento", "cuidado", "hidratación", "peeling"

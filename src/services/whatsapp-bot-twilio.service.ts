@@ -477,7 +477,8 @@ async function startBookingFlowWithEntities(
   // Intentar prellenar servicio si se detectó
   if (entities.services && entities.services.length > 0) {
     const serviceNames = services.map((s) => s.name);
-    const bestMatch = findBestMatch(entities.services[0], serviceNames, 0.6);
+    const serviceInput = entities.services.join(" ");
+    const bestMatch = findBestMatch(serviceInput, serviceNames, 0.4);
 
     if (bestMatch.matched) {
       const selected = services.find((s) => s.name === bestMatch.value);
@@ -485,6 +486,18 @@ async function startBookingFlowWithEntities(
         updatedData.serviceId = selected.id;
         updatedData.serviceName = selected.name;
         updatedData.serviceDuration = selected.duration;
+      }
+    } else {
+      // Fallback: buscar por inclusión
+      const inputLower = serviceInput.toLowerCase();
+      for (const svc of services) {
+        if (svc.name.toLowerCase().includes(inputLower) ||
+            inputLower.includes(svc.name.toLowerCase())) {
+          updatedData.serviceId = svc.id;
+          updatedData.serviceName = svc.name;
+          updatedData.serviceDuration = svc.duration;
+          break;
+        }
       }
     }
   }
@@ -495,6 +508,12 @@ async function startBookingFlowWithEntities(
     if (isValidFutureDate(selectedDate)) {
       updatedData.selectedDate = selectedDate.toISOString();
     }
+  }
+
+  // Guardar la hora solicitada si se detectó (para encontrar el mejor slot)
+  let requestedTime: string | undefined;
+  if (entities.times && entities.times.length > 0 && entities.times[0] !== "pronto") {
+    requestedTime = entities.times[0];
   }
 
   // Actualizar sesión con los datos prellenados
@@ -508,7 +527,7 @@ async function startBookingFlowWithEntities(
     // Tenemos todo, mostrar horarios disponibles
     const date = parseISO(updatedData.selectedDate);
     if (updatedData.serviceDuration) {
-      return await showAvailableSlots(session, updatedData, date);
+      return await showAvailableSlots(session, updatedData, date, requestedTime);
     }
   }
 
@@ -824,7 +843,8 @@ async function handleCustomDateInput(
 async function showAvailableSlots(
   session: WhatsAppBotSession,
   data: BotSessionData,
-  date: Date
+  date: Date,
+  requestedTime?: string
 ): Promise<BotResponse> {
   if (!data.manicuristId || !data.serviceDuration) {
     return {
@@ -846,13 +866,85 @@ async function showAvailableSlots(
     };
   }
 
+  // Si hay hora solicitada, intentar encontrar el slot más cercano
+  let selectedSlots = slots;
+  let timeNote = "";
+  if (requestedTime && requestedTime !== "09:00") {
+    const [targetHour, targetMinute] = requestedTime.split(":").map(Number);
+    
+    // Ordenar slots por cercanía a la hora solicitada
+    const sortedByDiff = [...slots].sort((a, b) => {
+      const diffA = Math.abs(a.start.getHours() - targetHour) + Math.abs(a.start.getMinutes() - targetMinute) / 60;
+      const diffB = Math.abs(b.start.getHours() - targetHour) + Math.abs(b.start.getMinutes() - targetMinute) / 60;
+      return diffA - diffB;
+    });
+    
+    const closestSlot = sortedByDiff[0];
+    const hourDiff = Math.abs(closestSlot.start.getHours() - targetHour);
+    
+    if (hourDiff <= 1) {
+      // Dentro de 1 hora, usar ese slot directamente
+      return await confirmSlotDirectly(session, data, closestSlot);
+    } else {
+      // Más de 1 hora de diferencia, mostrar todos los slots pero destacar los cercanos
+      timeNote = `\n✨ Solicitaste las ${requestedTime}. Los horarios más proches son:`;
+      selectedSlots = sortedByDiff.slice(0, 5);
+    }
+  }
+
   const formatted = format(date, "d/M", { locale: es });
   return {
-    message: `${buildDateConfirmedMessage(date)}\n\n${buildSlotSelectionMessage({
-      slots,
+    message: `${buildDateConfirmedMessage(date)}${timeNote}\n\n${buildSlotSelectionMessage({
+      slots: selectedSlots,
       showDate: true,
     })}`,
     nextStep: "slot",
+  };
+}
+
+async function confirmSlotDirectly(
+  session: WhatsAppBotSession,
+  data: BotSessionData,
+  slot: { start: Date; end: Date }
+): Promise<BotResponse> {
+  if (!data.clientId) {
+    return {
+      message: buildGenericErrorMessage(),
+      nextStep: "idle",
+    };
+  }
+
+  const appointment = await createAppointment({
+    clientId: data.clientId,
+    manicuristId: data.manicuristId!,
+    serviceId: data.serviceId!,
+    startAt: slot.start.toISOString(),
+    sendWhatsApp: true,
+  });
+
+  const appointmentWithRelations = await prisma.appointment.findUnique({
+    where: { id: appointment.id },
+    include: {
+      client: { select: { id: true, name: true, phone: true } },
+      manicurist: {
+        include: { user: { select: { id: true, name: true } } },
+      },
+      service: { select: { id: true, name: true, duration: true } },
+    },
+  });
+
+  const cleanedData = clearTemporarySessionData(data);
+  await prisma.whatsAppBotSession.update({
+    where: { id: session.id },
+    data: { data: cleanedData, step: "idle" },
+  });
+
+  return {
+    message: `📅 ¡Listo! Te agendé para el horario más proche a lo que pediste:\n\n${buildConfirmationMessage({
+      appointment: appointmentWithRelations as AppointmentWithRelations,
+    })}`,
+    nextStep: "idle",
+    shouldEndFlow: true,
   };
 }
 

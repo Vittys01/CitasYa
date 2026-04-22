@@ -90,6 +90,14 @@ import {
 import { addDays, format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { now, normalisePhone, toCanaryTimezone } from "@/lib/utils";
+import {
+  detectIntent,
+  extractEntities,
+  findBestMatch,
+  analyzeSelection,
+  type NLPIntent,
+  type NLPEntities,
+} from "@/lib/nlp-bot";
 
 // ─── Configuración ───────────────────────────────────────────────────────────
 
@@ -174,7 +182,7 @@ async function processMessage(
   const sessionData = (session.data as BotSessionData) || createEmptySessionData();
   const normalizedText = normalizeInputText(text);
 
-  // Detectar comandos globales
+  // Detectar comandos globales primero
   const command = detectCommand(normalizedText);
 
   // Si hay comando global y se puede procesar en este estado
@@ -182,13 +190,49 @@ async function processMessage(
     return await processCommand(session, command, text, sessionData);
   }
 
-  // Si no hay comando y estamos en idle, mostrar menú
+  // Si estamos en idle y no hay comando, intentar NLP para procesar mensaje natural
   if (session.step === "idle" && !command) {
-    return await handleIdleState(session, sessionData);
+    return await handleNaturalLanguageMessage(session, text, sessionData);
   }
 
-  // Procesar según el estado actual del flujo
+  // Procesar según el estado actual del flujo (también con NLP si aplica)
   return await processFlowStep(session, text, sessionData, command);
+}
+
+/**
+ * Procesa un mensaje en lenguaje natural usando NLP
+ * Extrae intenciones y entidades del mensaje del usuario
+ */
+async function handleNaturalLanguageMessage(
+  session: WhatsAppBotSession,
+  text: string,
+  data: BotSessionData
+): Promise<BotResponse> {
+  // Usar NLP para detectar intención
+  const intent = detectIntent(text);
+  const entities = extractEntities(text);
+
+  console.log(`[NLP] Intent: ${intent.type} (confidence: ${intent.confidence})`);
+  console.log(`[NLP] Entities:`, JSON.stringify(entities));
+
+  // Si la intención es clara (booking o disponibilidad) con alta confianza
+  if (intent.type === "booking" || intent.type === "availability") {
+    // Si tiene entidades suficientes, intentar auto-completar el flujo
+    const hasEntities = (entities.services && entities.services.length > 0) || 
+                      (entities.dates && entities.dates.length > 0) || 
+                      (entities.times && entities.times.length > 0);
+    if (hasEntities) {
+      return await handleSmartBookingFlow(session, text, data, intent, entities);
+    }
+  }
+
+  // Si la intención es ver citas
+  if (intent.type === "viewing") {
+    return await handleViewAppointments(session, data);
+  }
+
+  // Si no entiende, mostrar menú de bienvenida
+  return await handleIdleState(session, data);
 }
 
 /**
@@ -318,6 +362,198 @@ async function handleIdleState(
     message,
     nextStep: "idle",
     shouldEndFlow: false,
+  };
+}
+
+// ─── Manejo de Flujo Inteligente con NLP ────────────────────────────────────────
+
+/**
+ * Maneja el flujo de agendado inteligente usando NLP
+ * Intenta auto-completar con las entidades extraídas del mensaje
+ */
+async function handleSmartBookingFlow(
+  session: WhatsAppBotSession,
+  text: string,
+  data: BotSessionData,
+  intent: NLPIntent,
+  entities: NLPEntities
+): Promise<BotResponse> {
+  const businessId = session.businessId;
+  const services = await getAvailableServices(businessId);
+  const manicurists = await getAvailableManicurists(businessId);
+
+  if (manicurists.length === 0) {
+    return {
+      message: buildNoManicuristsMessage(),
+      nextStep: "idle",
+    };
+  }
+
+  if (services.length === 0) {
+    return {
+      message: buildNoServicesMessage(),
+      nextStep: "idle",
+    };
+  }
+
+  let currentData = clearTemporarySessionData(data);
+
+  // 1. Extraer servicio
+  if (entities.services && entities.services.length > 0) {
+    const serviceNames = services.map(s => s.name);
+    const serviceInput = entities.services.join(" ");
+    const serviceMatch = findBestMatch(serviceInput, serviceNames, 0.5);
+    
+    if (serviceMatch.matched) {
+      const service = services.find(s => s.name === serviceMatch.value);
+      if (service) {
+        currentData = updateSessionData(currentData, {
+          serviceId: service.id,
+          serviceName: service.name,
+          serviceDuration: service.duration,
+        });
+        console.log(`[SmartBooking] Service matched: ${service.name}`);
+      }
+    } else {
+      // Intentar matching más flexible
+      const serviceLower = serviceInput.toLowerCase();
+      for (const svc of services) {
+        if (svc.name.toLowerCase().includes(serviceLower) ||
+            serviceLower.includes(svc.name.toLowerCase())) {
+          currentData = updateSessionData(currentData, {
+            serviceId: svc.id,
+            serviceName: svc.name,
+            serviceDuration: svc.duration,
+          });
+          console.log(`[SmartBooking] Service matched (fuzzy): ${svc.name}`);
+          break;
+        }
+      }
+    }
+  }
+
+  // Si aún no hay servicio, iniciar flow normal en paso de servicio
+  if (!currentData.serviceId) {
+    return await startBookingFlow(session, data);
+  }
+
+  // 2. Obtener cliente si no lo tenemos
+  if (!currentData.clientId) {
+    const client = await getOrCreateClient(session.phoneE164, businessId);
+    currentData = updateSessionData(currentData, {
+      clientId: client.id,
+      clientName: client.name,
+    });
+  }
+
+  // 3. Si tenemos fecha, intentar encontrar slot
+  if (entities.dates && entities.dates.length > 0) {
+    const selectedDate = entities.dates[0];
+    
+    let selectedTime = "09:00";
+    if (entities.times && entities.times.length > 0 && entities.times[0] !== "pronto") {
+      selectedTime = entities.times[0];
+    }
+
+    console.log(`[SmartBooking] Looking for slot: ${selectedDate.toDateString()} at ${selectedTime}`);
+
+    // Intentar con cada manicurista hasta encontrar uno disponible
+    for (const manicurist of manicurists) {
+      const slots = await getAvailableSlots(
+        manicurist.id,
+        selectedDate,
+        currentData.serviceDuration!
+      );
+
+      if (slots.length === 0) continue;
+
+      // Buscar el slot más cercano a la hora solicitada
+      const [targetHour, targetMinute] = selectedTime.split(":").map(Number);
+      
+      let bestSlot = slots[0];
+      let minDiff = 24;
+      
+      for (const slot of slots) {
+        const slotHour = slot.start.getHours();
+        const slotMinute = slot.start.getMinutes();
+        const diff = Math.abs(slotHour - targetHour) + Math.abs(slotMinute - targetMinute) / 60;
+        
+        if (diff < minDiff) {
+          minDiff = diff;
+          bestSlot = slot;
+        }
+      }
+
+      // Si está muy lejos (>2 horas), mostrar opciones en lugar de crear directamente
+      if (minDiff > 2) {
+        currentData = updateSessionData(currentData, {
+          manicuristId: manicurist.id,
+          manicuristName: manicurist.user.name,
+          selectedDate: selectedDate.toISOString(),
+        });
+        
+        await prisma.whatsAppBotSession.update({
+          where: { id: session.id },
+          data: { data: currentData },
+        });
+
+        return {
+          message: `${buildServiceConfirmedMessage(currentData.serviceName!, currentData.serviceDuration!)}\n\n${buildDateConfirmedMessage(selectedDate)}\n\n✨ No había disponibilidad a las ${selectedTime}, pero tenemos estos horarios:\n\n${buildSlotSelectionMessage({ slots, showDate: true })}`,
+          nextStep: "slot",
+        };
+      }
+
+      // Crear la cita
+      currentData = updateSessionData(currentData, {
+        manicuristId: manicurist.id,
+        manicuristName: manicurist.user.name,
+      });
+
+      const appointment = await createAppointment({
+        clientId: currentData.clientId!,
+        manicuristId: manicurist.id,
+        serviceId: currentData.serviceId!,
+        startAt: bestSlot.start.toISOString(),
+        sendWhatsApp: true,
+      });
+
+      const appointmentWithRelations = await prisma.appointment.findUnique({
+        where: { id: appointment.id },
+        include: {
+          client: { select: { id: true, name: true, phone: true } },
+          manicurist: {
+            include: { user: { select: { id: true, name: true } } },
+          },
+          service: { select: { id: true, name: true, duration: true } },
+        },
+      });
+
+      const cleanedData = clearTemporarySessionData(currentData);
+      await prisma.whatsAppBotSession.update({
+        where: { id: session.id },
+        data: { data: cleanedData, step: "idle" },
+      });
+
+      return {
+        message: `📅 Te encontré un horario proche:\n\n${buildConfirmationMessage({
+          appointment: appointmentWithRelations as AppointmentWithRelations,
+        })}`,
+        nextStep: "idle",
+        shouldEndFlow: true,
+      };
+    }
+
+    // Ninguna disponibilidad, mostrar otros días
+    return {
+      message: `${buildServiceConfirmedMessage(currentData.serviceName!, currentData.serviceDuration!)}\n\n😔 No hay disponibilidad para el ${format(selectedDate, "d/M")}. ¿Querés ver otros días?`,
+      nextStep: "date",
+    };
+  }
+
+  // 4. Si no hay fecha específica, pedir fecha
+  return {
+    message: `${buildServiceConfirmedMessage(currentData.serviceName!, currentData.serviceDuration!)}\n\n${buildDateSelectionMessage()}`,
+    nextStep: "date",
   };
 }
 
