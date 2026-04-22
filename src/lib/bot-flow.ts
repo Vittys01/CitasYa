@@ -6,7 +6,7 @@
 
 import type { WhatsAppBotSession } from "@prisma/client";
 import type { ManicuristWithUser, Service } from "@/types";
-import { now } from "./utils";
+import { now, canaryDate } from "./utils";
 
 // ─── Tipos de Estados del Flujo ────────────────────────────────────────────────
 
@@ -273,8 +273,10 @@ export function parseCustomDate(text: string): Date | null {
   const currentTime = now();
   const year = currentTime.getFullYear();
 
-  // Crear fecha en zona horaria del usuario (simple approximation)
-  const date = new Date(year, month - 1, day, 0, 0, 0, 0);
+  const date = canaryDate(
+    `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+    0, 0
+  );
 
   // Si la fecha ya pasó, usar el próximo año
   if (date < currentTime) {
@@ -394,7 +396,7 @@ export function hasSessionExpired(
 ): boolean {
   if (!session.updatedAt) return false;
 
-  const currentTime = now();
+  const currentTime = new Date();
   const sessionTime = new Date(session.updatedAt);
   const elapsedMinutes = (currentTime.getTime() - sessionTime.getTime()) / (1000 * 60);
 
@@ -410,7 +412,7 @@ export function getSessionRemainingTime(
 ): number | null {
   if (!session.updatedAt) return null;
 
-  const currentTime = now();
+  const currentTime = new Date();
   const sessionTime = new Date(session.updatedAt);
   const elapsedMinutes = (currentTime.getTime() - sessionTime.getTime()) / (1000 * 60);
   const remaining = timeoutMinutes - elapsedMinutes;

@@ -6,6 +6,7 @@
  */
 
 import "dotenv/config";
+process.env.TZ = "Atlantic/Canary";
 import { autoCompleteExpiredAppointments } from "@/services/appointment.service";
 import { reconcileReminders } from "@/jobs/reminder.job";
 

@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { ceilToNextSlotMinute, cn, formatDateShort, formatHour, now } from "@/lib/utils";
+import { ceilToNextSlotMinute, cn, formatDateShort, formatHour, now, canaryDate } from "@/lib/utils";
 import { formatPrice } from "@/lib/format-price";
 import type { Manicurist, Client, Schedule } from "@prisma/client";
 import { appointmentFromApiJson, type ServiceForClient, type AppointmentForClient } from "@/lib/serialize";
@@ -440,7 +440,7 @@ export default function NewAppointmentButton({
         return;
       }
       const dateStr = pickerDate;
-      finalStartAt = new Date(`${dateStr}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00`).toISOString();
+      finalStartAt = canaryDate(dateStr, hour, minute).toISOString();
     }
     if (!finalStartAt || !data.manicuristId || !data.clientId || selectedServices.length === 0) {
       setError(g(settings, "validation.fillAll", "Completá cliente, al menos un servicio y horario."));

@@ -67,9 +67,48 @@ export function formatMonthYear(date: Date): string {
  * ajustando la diferencia horaria
  */
 export function toCanaryTimezone(date: Date): Date {
-  // Obtenemos la fecha/hora en la zona horaria de Canarias
   const canaryTimeStr = date.toLocaleString("en-US", { timeZone: "Atlantic/Canary" });
   return new Date(canaryTimeStr);
+}
+
+/**
+ * Crea un Date cuyo timestamp UTC representa la hora indicada en zona horaria de Canarias.
+ * Funciona correctamente en frontend (navegador) y backend (Node.js),
+ * independientemente de la timezone del sistema.
+ *
+ * Ejemplo: canaryDate("2026-04-22", 10, 30) → Date que en UTC vale 09:30 (si es verano, UTC+1)
+ *   Al mostrar con formatHour() (que usa timeZone Atlantic/Canary) → "10:30"
+ */
+export function canaryDate(dateStr: string, hour: number, minute: number, second = 0, ms = 0): Date {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const utcMs = Date.UTC(y, m - 1, d, hour, minute, second, ms);
+  const utcDate = new Date(utcMs);
+
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Atlantic/Canary",
+    hour12: false,
+    hour: "2-digit",
+    minute: "2-digit",
+  }).formatToParts(utcDate);
+
+  const h = parseInt(parts.find(p => p.type === "hour")!.value, 10);
+  const canaryH = h === 24 ? 0 : h;
+  const canaryM = parseInt(parts.find(p => p.type === "minute")!.value, 10);
+
+  const offsetMin = (canaryH * 60 + canaryM) - (hour * 60 + minute);
+
+  return new Date(utcMs - offsetMin * 60000 + ms);
+}
+
+/**
+ * Devuelve los límites del día indicado en timezone de Canarias como timestamps UTC.
+ * Útil para queries a la BD: start = 00:00:00.000 Canary, end = 23:59:59.999 Canary
+ */
+export function canaryDayBounds(dateStr: string): { start: Date; end: Date } {
+  return {
+    start: canaryDate(dateStr, 0, 0, 0, 0),
+    end: new Date(canaryDate(dateStr, 23, 59, 59, 0).getTime() + 999),
+  };
 }
 
 /** Paso de la grilla de turnos (API, lista de horarios, “desde ahora”). */

@@ -7,7 +7,7 @@
 
 import { addDays, format, parse, isValid, startOfDay, endOfDay, differenceInDays, differenceInHours, isSameDay } from "date-fns";
 import { es } from "date-fns/locale";
-import { now } from "./utils";
+import { now, canaryDate } from "./utils";
 
 // ─── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -415,11 +415,9 @@ function extractDates(text: string): Date[] {
           const [day, month, year] = match!.slice(1, 4).map(Number);
 
           if (!isNaN(day) && !isNaN(month)) {
-            const constructedDate = new Date(
-              year || currentTime.getFullYear(),
-              month - 1,
-              day
-            );
+            const y = year || currentTime.getFullYear();
+            const ds = `${y}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+            const constructedDate = canaryDate(ds, 0, 0);
 
             if (isValid(constructedDate)) {
               if (!year && constructedDate < currentTime) {
@@ -438,23 +436,23 @@ function extractDates(text: string): Date[] {
         date = new Date(currentTime);
         break;
 
-      case "afternoon":
-        const afternoon = new Date(currentTime);
-        afternoon.setHours(14, 0, 0, 0);
-        date = afternoon;
+      case "afternoon": {
+        const ds = currentTime.toISOString().slice(0, 10);
+        date = canaryDate(ds, 14, 0);
         break;
+      }
 
-      case "evening":
-        const evening = new Date(currentTime);
-        evening.setHours(20, 0, 0, 0);
-        date = evening;
+      case "evening": {
+        const ds = currentTime.toISOString().slice(0, 10);
+        date = canaryDate(ds, 20, 0);
         break;
+      }
 
-      case "early_morning":
-        const earlyMorning = new Date(currentTime);
-        earlyMorning.setHours(8, 0, 0, 0);
-        date = earlyMorning;
+      case "early_morning": {
+        const ds = currentTime.toISOString().slice(0, 10);
+        date = canaryDate(ds, 8, 0);
         break;
+      }
     }
 
     if (date) {

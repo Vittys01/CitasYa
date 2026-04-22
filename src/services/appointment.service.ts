@@ -17,6 +17,8 @@ import {
   SCHEDULE_SLOT_MINUTES,
   now,
   toCanaryTimezone,
+  canaryDate,
+  canaryDayBounds,
 } from "@/lib/utils";
 import {
   enqueueConfirmation,
@@ -47,12 +49,11 @@ export async function isSlotAvailable(
 
   if (!schedule || !schedule.isActive) return false;
 
+  const dateStr = format(toCanaryTimezone(startAt), "yyyy-MM-dd");
   const [schedStart, schedEnd] = [schedule.startTime, schedule.endTime].map(
     (t) => {
       const [h, m] = t.split(":").map(Number);
-      const d = new Date(startAt);
-      d.setHours(h, m, 0, 0);
-      return d;
+      return canaryDate(dateStr, h, m);
     }
   );
 
@@ -391,10 +392,8 @@ export async function getAppointmentsByDate(
   date: Date,
   options?: { manicuristId?: string; businessId?: string }
 ): Promise<AppointmentWithRelations[]> {
-  const start = new Date(date);
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(date);
-  end.setHours(23, 59, 59, 999);
+  const dateStr = format(toCanaryTimezone(date), "yyyy-MM-dd");
+  const { start, end } = canaryDayBounds(dateStr);
 
   const rows = await prisma.appointment.findMany({
     where: {
@@ -454,7 +453,6 @@ export async function getAvailableSlots(
   manicuristId: string,
   date: Date,
   serviceDuration: number,
-  /** Si el día es “hoy”, solo slots desde este instante (p. ej. múltiplo de 5 min ≥ ahora). */
   earliestStart?: Date
 ): Promise<{ start: Date; end: Date }[]> {
   const dayOfWeek = date.getDay();
@@ -464,19 +462,14 @@ export async function getAvailableSlots(
 
   if (!schedule || !schedule.isActive) return [];
 
+  const dateStr = format(toCanaryTimezone(date), "yyyy-MM-dd");
+  const { start: dayStart, end: dayEnd } = canaryDayBounds(dateStr);
+
   const [sh, sm] = schedule.startTime.split(":").map(Number);
   const [eh, em] = schedule.endTime.split(":").map(Number);
 
-  const schedStart = new Date(date);
-  schedStart.setHours(sh, sm, 0, 0);
-  const schedEnd = new Date(date);
-  schedEnd.setHours(eh, em, 0, 0);
-
-  // Existing booked intervals
-  const dayStart = new Date(date);
-  dayStart.setHours(0, 0, 0, 0);
-  const dayEnd = new Date(date);
-  dayEnd.setHours(23, 59, 59, 999);
+  const schedStart = canaryDate(dateStr, sh, sm);
+  const schedEnd = canaryDate(dateStr, eh, em);
 
   const existingAppts = await prisma.appointment.findMany({
     where: {
@@ -501,7 +494,6 @@ export async function getAvailableSlots(
     ...blockedTimes.map((b) => ({ start: b.startAt, end: b.endAt })),
   ];
 
-  // Generate slots every 15 minutes
   const slots: { start: Date; end: Date }[] = [];
   let cursor = new Date(schedStart);
 

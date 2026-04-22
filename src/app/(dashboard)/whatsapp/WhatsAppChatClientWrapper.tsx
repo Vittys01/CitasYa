@@ -7,12 +7,20 @@ import WhatsAppChat from "@/components/whatsapp/WhatsAppChat";
 
 export default function WhatsAppChatClientWrapper({
   businessId,
+  twilioConfig,
 }: {
   businessId: string;
+  twilioConfig?: {
+    contentSidConfirmation: string;
+    contentSidReminder: string;
+    contentSidCancellation: string;
+    twilioWhatsAppNumber: string;
+  };
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const selectedPhone = searchParams.get("contact");
+  const [showConfig, setShowConfig] = useState(false);
 
   const [contacts, setContacts] = useState<any[]>([]);
   const [contact, setContact] = useState<any>(undefined);
@@ -163,7 +171,7 @@ export default function WhatsAppChatClientWrapper({
   };
 
   return (
-    <div className="flex h-[calc(100vh-4rem)]">
+    <div className="flex flex-col h-[calc(100vh-4rem)]">
       {/* Error Display */}
       {error && (
         <div className="fixed top-0 left-0 right-0 bg-red-500 text-white p-4 z-50 flex justify-between items-center">
@@ -177,46 +185,90 @@ export default function WhatsAppChatClientWrapper({
         </div>
       )}
 
-      {/* Mobile view: show contacts or chat */}
-      <div className="flex-1 flex md:hidden">
-        {selectedPhone ? (
-          <div className="flex-1 flex flex-col">
-            <button
-              onClick={handleBack}
-              className="px-4 py-3 bg-white border-b border-[#e6d5c3] flex items-center gap-2 text-earth hover:bg-[#fbf6f1] transition"
-            >
-              <span className="material-symbols-outlined">arrow_back</span>
-              <span className="text-sm font-medium">Volver</span>
+      {/* Config panel */}
+      {showConfig && twilioConfig && (
+        <div className="border-b border-[#e6d5c3] bg-[#FFFDF5] px-6 py-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-bold text-earth flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[16px]">settings</span>
+              Configuracion Twilio
+            </h3>
+            <button onClick={() => setShowConfig(false)} className="text-[#bda696] hover:text-earth transition">
+              <span className="material-symbols-outlined text-[18px]">close</span>
             </button>
-            <WhatsAppChat
-              contact={contact}
-              messages={messages}
-              onSendMessage={handleSendMessage}
-              loading={loadingMessages}
-            />
           </div>
-        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div className="bg-white rounded-lg border border-[#e6d5c3] p-3">
+              <p className="text-earth-muted font-medium mb-1">WhatsApp Number</p>
+              <p className="font-mono text-earth">{twilioConfig.twilioWhatsAppNumber || "No configurado"}</p>
+            </div>
+            <div className="bg-white rounded-lg border border-[#e6d5c3] p-3">
+              <p className="text-earth-muted font-medium mb-1">Confirmacion</p>
+              <p className="font-mono text-earth break-all">{twilioConfig.contentSidConfirmation || "No configurado"}</p>
+            </div>
+            <div className="bg-white rounded-lg border border-[#e6d5c3] p-3">
+              <p className="text-earth-muted font-medium mb-1">Recordatorio</p>
+              <p className="font-mono text-earth break-all">{twilioConfig.contentSidReminder || "No configurado"}</p>
+            </div>
+            <div className="bg-white rounded-lg border border-[#e6d5c3] p-3">
+              <p className="text-earth-muted font-medium mb-1">Cancelacion</p>
+              <p className="font-mono text-earth break-all">{twilioConfig.contentSidCancellation || "No configurado"}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-1 min-h-0 relative">
+        {/* Config toggle button */}
+        <button
+          onClick={() => setShowConfig(!showConfig)}
+          className="absolute top-3 right-3 z-20 w-9 h-9 rounded-full bg-white border border-[#e6d5c3] shadow-warm-sm flex items-center justify-center text-earth-muted hover:text-earth hover:bg-[#fbf6f1] transition"
+          title="Configuracion Twilio"
+        >
+          <span className="material-symbols-outlined text-[18px]">settings</span>
+        </button>
+
+        {/* Mobile view: show contacts or chat */}
+        <div className="flex-1 flex md:hidden">
+          {selectedPhone ? (
+            <div className="flex-1 flex flex-col">
+              <button
+                onClick={handleBack}
+                className="px-4 py-3 bg-white border-b border-[#e6d5c3] flex items-center gap-2 text-earth hover:bg-[#fbf6f1] transition"
+              >
+                <span className="material-symbols-outlined">arrow_back</span>
+                <span className="text-sm font-medium">Volver</span>
+              </button>
+              <WhatsAppChat
+                contact={contact}
+                messages={messages}
+                onSendMessage={handleSendMessage}
+                loading={loadingMessages}
+              />
+            </div>
+          ) : (
+            <WhatsAppContactsList
+              contacts={contacts}
+              selectedPhone={selectedPhone || undefined}
+              loading={loadingContacts}
+            />
+          )}
+        </div>
+
+        {/* Desktop view: show contacts and chat */}
+        <div className="hidden md:flex flex-1">
           <WhatsAppContactsList
             contacts={contacts}
             selectedPhone={selectedPhone || undefined}
             loading={loadingContacts}
           />
-        )}
-      </div>
-
-      {/* Desktop view: show contacts and chat */}
-      <div className="hidden md:flex flex-1">
-        <WhatsAppContactsList
-          contacts={contacts}
-          selectedPhone={selectedPhone || undefined}
-          loading={loadingContacts}
-        />
-        <WhatsAppChat
-          contact={contact}
-          messages={messages}
-          onSendMessage={handleSendMessage}
-          loading={loadingMessages}
-        />
+          <WhatsAppChat
+            contact={contact}
+            messages={messages}
+            onSendMessage={handleSendMessage}
+            loading={loadingMessages}
+          />
+        </div>
       </div>
     </div>
   );
