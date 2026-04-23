@@ -484,10 +484,20 @@ export default function NewAppointmentButton({
 
     // Si el usuario ingresa hora de finalización, calcular duración
     if (useEndTime && pickerDate && endHour && endMinute) {
-      const startH = parseInt(manualHour, 10);
-      const startM = parseInt(manualMinute, 10);
+      let startH: number, startM: number;
+      
+      if (timeEntryMode === "slots" && data.startAt) {
+        const startDt = new Date(data.startAt);
+        startH = startDt.getHours();
+        startM = startDt.getMinutes();
+      } else {
+        startH = parseInt(manualHour, 10);
+        startM = parseInt(manualMinute, 10);
+      }
+      
       const endH = parseInt(endHour, 10);
       const endM = parseInt(endMinute, 10);
+      
       if (!isNaN(startH) && !isNaN(startM) && !isNaN(endH) && !isNaN(endM)) {
         const startMins = startH * 60 + startM;
         const endMins = endH * 60 + endM;
@@ -542,6 +552,13 @@ export default function NewAppointmentButton({
         }
       }
     }
+
+    // Validar hora de finalización si está activada (para ambos modos)
+    if (useEndTime && pickerDate && endHour && endMinute && !data.startAt && timeEntryMode === "slots") {
+      setError(g(settings, "validation.fillAll", "Seleccioná un horario primero."));
+      return;
+    }
+
     if (!finalStartAt || !data.manicuristId || !data.clientId || selectedServices.length === 0) {
       setError(g(settings, "validation.fillAll", "Completá cliente, al menos un servicio y horario."));
       return;
@@ -1203,96 +1220,115 @@ export default function NewAppointmentButton({
                       Elegir hora
                     </button>
                   </div>
-                  {/* Hora manual */}
-                  {timeEntryMode === "manual" && (
-                    <>
-                      <div className="flex items-center gap-3">
-                        <div className="flex-1">
-                          <label className={labelCls}>Hora</label>
-                          <input
-                            type="number"
-                            min={0}
-                            max={23}
-                            value={manualHour}
-                            onChange={(e) => setManualHour(e.target.value.replace(/\D/g, "").slice(0, 2))}
-                            placeholder="00"
-                            className={inputCls}
-                          />
-                        </div>
-                        <span className="text-earth font-medium mt-5">:</span>
-                        <div className="flex-1">
-                          <label className={labelCls}>Minutos</label>
-                          <input
-                            type="number"
-                            min={0}
-                            max={59}
-                            value={manualMinute}
-                            onChange={(e) => setManualMinute(e.target.value.replace(/\D/g, "").slice(0, 2))}
-                            placeholder="00"
-                            className={inputCls}
-                          />
-                        </div>
+                  {/* Hora de finalizar - disponible en ambos modos */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setUseEndTime((v) => !v)}
+                      className={cn(
+                        "px-3 py-1.5 text-xs font-medium rounded-lg transition",
+                        useEndTime
+                          ? "bg-emerald-600 text-white"
+                          : "bg-[#e6d5c3] text-earth hover:bg-[#d7ccc8]"
+                      )}
+                    >
+                      {useEndTime ? "Hora fin activada" : "Establecer hora fin"}
+                    </button>
+                    {useEndTime && pickerDate && (
+                      <span className="text-xs text-earth-muted">
+                        ({g(settings, "form.field.endTimeHelp", "La cita terminará a esta hora")})
+                      </span>
+                    )}
+                  </div>
+                  {useEndTime && pickerDate && (
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1">
+                        <label className={labelCls}>Hora fin</label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={23}
+                          value={endHour}
+                          onChange={(e) => setEndHour(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                          placeholder="00"
+                          className={inputCls}
+                        />
                       </div>
-                      {/* Hora de finalizar */}
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setUseEndTime((v) => !v)}
-                          className={cn(
-                            "px-3 py-1.5 text-xs font-medium rounded-lg transition",
-                            useEndTime
-                              ? "bg-emerald-600 text-white"
-                              : "bg-[#e6d5c3] text-earth hover:bg-[#d7ccc8]"
-                          )}
-                        >
-                          {useEndTime ? "Hora fin activada" : "Establecer hora fin"}
-                        </button>
+                      <span className="text-earth font-medium mt-5">:</span>
+                      <div className="flex-1">
+                        <label className={labelCls}>Minutos fin</label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={59}
+                          value={endMinute}
+                          onChange={(e) => setEndMinute(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                          placeholder="00"
+                          className={inputCls}
+                        />
                       </div>
-                      {useEndTime && (
-                        <div className="flex items-center gap-3">
-                          <div className="flex-1">
-                            <label className={labelCls}>Hora fin</label>
-                            <input
-                              type="number"
-                              min={0}
-                              max={23}
-                              value={endHour}
-                              onChange={(e) => setEndHour(e.target.value.replace(/\D/g, "").slice(0, 2))}
-                              placeholder="00"
-                              className={inputCls}
-                            />
-                          </div>
-                          <span className="text-earth font-medium mt-5">:</span>
-                          <div className="flex-1">
-                            <label className={labelCls}>Minutos fin</label>
-                            <input
-                              type="number"
-                              min={0}
-                              max={59}
-                              value={endMinute}
-                              onChange={(e) => setEndMinute(e.target.value.replace(/\D/g, "").slice(0, 2))}
-                              placeholder="00"
-                              className={inputCls}
-                            />
-                          </div>
-                          {endHour && endMinute && manualHour && manualMinute && (
-                            <div className="text-xs text-earth-muted self-end pb-2">
-                              ({(() => {
-                                const startH = parseInt(manualHour, 10);
-                                const startM = parseInt(manualMinute, 10);
-                                const endH = parseInt(endHour, 10);
-                                const endM = parseInt(endMinute, 10);
-                                const startMins = startH * 60 + startM;
-                                const endMins = endH * 60 + endM;
-                                let diff = endMins - startMins;
-                                if (diff < 0) diff += 24 * 60;
-                                return diff;
-                              })()} min)
-                            </div>
-                          )}
+                      {endHour && endMinute && timeEntryMode === "manual" && manualHour && manualMinute && (
+                        <div className="text-xs text-earth-muted self-end pb-2">
+                          ({(() => {
+                            const startH = parseInt(manualHour, 10);
+                            const startM = parseInt(manualMinute, 10);
+                            const endH = parseInt(endHour, 10);
+                            const endM = parseInt(endMinute, 10);
+                            const startMins = startH * 60 + startM;
+                            const endMins = endH * 60 + endM;
+                            let diff = endMins - startMins;
+                            if (diff < 0) diff += 24 * 60;
+                            return diff;
+                          })()} min)
                         </div>
                       )}
-                    </>
+                      {endHour && endMinute && timeEntryMode === "slots" && watch("startAt") && (
+                        <div className="text-xs text-earth-muted self-end pb-2">
+                          ({(() => {
+                            const startDt = new Date(watch("startAt"));
+                            const startH = parseInt(format(startDt, "HH"), 10);
+                            const startM = parseInt(format(startDt, "mm"), 10);
+                            const endH = parseInt(endHour, 10);
+                            const endM = parseInt(endMinute, 10);
+                            const startMins = startH * 60 + startM;
+                            const endMins = endH * 60 + endM;
+                            let diff = endMins - startMins;
+                            if (diff < 0) diff += 24 * 60;
+                            return diff;
+                          })()} min)
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {/* Hora manual - solo cuando está en modo manual */}
+                  {timeEntryMode === "manual" && (
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1">
+                        <label className={labelCls}>Hora</label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={23}
+                          value={manualHour}
+                          onChange={(e) => setManualHour(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                          placeholder="00"
+                          className={inputCls}
+                        />
+                      </div>
+                      <span className="text-earth font-medium mt-5">:</span>
+                      <div className="flex-1">
+                        <label className={labelCls}>Minutos</label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={59}
+                          value={manualMinute}
+                          onChange={(e) => setManualMinute(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                          placeholder="00"
+                          className={inputCls}
+                        />
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>

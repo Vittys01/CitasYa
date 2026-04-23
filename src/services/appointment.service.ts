@@ -188,7 +188,7 @@ export async function createAppointment(
       endAt,
       price: finalPrice,
       notes: input.notes,
-      status: "PENDING",
+      status: "CONFIRMED",
       services: {
         create: serviceItems.map((item, i) => {
           const svc = serviceMap.get(item.serviceId)!;
@@ -560,7 +560,7 @@ export async function getNextAvailableSlots(
 export async function autoCompleteExpiredAppointments(): Promise<number> {
   const result = await prisma.appointment.updateMany({
     where: {
-      status: "PENDING",
+      status: "CONFIRMED",
       endAt: { lt: now() },
     },
     data: { status: "COMPLETED" },

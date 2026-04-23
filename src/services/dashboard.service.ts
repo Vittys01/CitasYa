@@ -46,9 +46,11 @@ export async function getDashboardStats(
     todayAppointments.map((g) => [g.status, g._count._all])
   );
 
+  const pendingCount = (statusMap["PENDING"] ?? 0) + (statusMap["CONFIRMED"] ?? 0);
+
   return {
     todayAppointments: todayAppointments.reduce((s, g) => s + g._count._all, 0),
-    pendingToday: statusMap["PENDING"] ?? 0,
+    pendingToday: pendingCount,
     completedToday: statusMap["COMPLETED"] ?? 0,
     revenueToday: Number(revenueToday._sum.price ?? 0),
     revenueRange: Number(revenueRange._sum.price ?? 0),
