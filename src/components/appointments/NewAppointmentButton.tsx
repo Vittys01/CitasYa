@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { ceilToNextSlotMinute, cn, formatDateShort, formatHour, now, canaryDate } from "@/lib/utils";
+import { ceilToNextSlotMinute, cn, formatDateShort, formatHour, now, canaryDate, toCanaryTimezone } from "@/lib/utils";
 import { formatPrice } from "@/lib/format-price";
 import type { Manicurist, Client, Schedule } from "@prisma/client";
 import { appointmentFromApiJson, type ServiceForClient, type AppointmentForClient } from "@/lib/serialize";
@@ -226,7 +226,7 @@ export default function NewAppointmentButton({
               setValue("manicuristId", match.manicuristId, { shouldValidate: false });
             } else {
               setTimeEntryMode("manual");
-              const originalDate = new Date(edit.startAt as string);
+              const originalDate = toCanaryTimezone(new Date(edit.startAt as string));
               setPickerDate(format(originalDate, "yyyy-MM-dd"));
               setManualHour(format(originalDate, "HH"));
               setManualMinute(format(originalDate, "mm"));
@@ -294,7 +294,7 @@ export default function NewAppointmentButton({
               setValue("manicuristId", match.manicuristId, { shouldValidate: false });
             } else {
               setTimeEntryMode("manual");
-              const originalDate = new Date(edit.startAt as string);
+              const originalDate = toCanaryTimezone(new Date(edit.startAt as string));
               setManualHour(format(originalDate, "HH"));
               setManualMinute(format(originalDate, "mm"));
               setValue("startAt", edit.startAt as string, { shouldValidate: false });
@@ -435,7 +435,7 @@ export default function NewAppointmentButton({
     setValue("manicuristId", a.manicuristId, { shouldValidate: true });
     setValue("notes", a.notes ?? "", { shouldValidate: false });
     setValue("status", a.status, { shouldValidate: false });
-    const d = new Date(a.startAt as string);
+    const d = toCanaryTimezone(new Date(a.startAt as string));
     setPickerDate(format(d, "yyyy-MM-dd"));
     setTimeEntryMode("manual");
     setManualHour(format(d, "HH"));
