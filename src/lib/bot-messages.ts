@@ -234,7 +234,7 @@ No tenés citas agendadas en este momento.
     const manicuristName = apt.manicurist.user.name;
     const serviceName = apt.service.name;
     const price = Number(apt.price).toFixed(0);
-    const statusEmoji = apt.status === "CONFIRMED" ? "✅" : "⏳";
+    const statusEmoji = apt.status === "PENDING" ? "⏳" : "✅";
 
     message += `${statusEmoji} ${index + 1}. ${date} ${time} - ${serviceName}
    con ${manicuristName} - $${price}\n\n`;

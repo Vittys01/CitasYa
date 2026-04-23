@@ -74,7 +74,7 @@ export async function isSlotAvailable(
     where: {
       manicuristId,
       id: excludeAppointmentId ? { not: excludeAppointmentId } : undefined,
-      status: { in: ["PENDING", "CONFIRMED"] },
+      status: { in: ["PENDING"] },
       startAt: { lt: endAt },
       endAt: { gt: startAt },
     },
@@ -94,7 +94,7 @@ export async function getClientOverlappingAppointment(
     where: {
       clientId,
       ...(excludeAppointmentId ? { id: { not: excludeAppointmentId } } : {}),
-      status: { in: ["PENDING", "CONFIRMED"] },
+      status: { in: ["PENDING"] },
       startAt: { lt: endAt },
       endAt: { gt: startAt },
     },
@@ -220,7 +220,7 @@ export async function updateAppointment(
   id: string,
   input: UpdateAppointmentInput
 ): Promise<AppointmentWithRelations | null> {
-  if (input.status === "CANCELLED") {
+  if (input.status === "COMPLETED") {
     await cancelAppointment(id);
     return null;
   }
@@ -304,7 +304,7 @@ export async function updateAppointment(
       include: appointmentInclude,
     });
 
-    if (updated.status !== "CANCELLED" && updated.status !== "COMPLETED") {
+    if (updated.status !== "COMPLETED") {
       cancelScheduledReminder(id);
       if (input.sendWhatsApp !== false) {
         scheduleReminder(id, startAt);
@@ -357,7 +357,7 @@ export async function updateAppointment(
     include: appointmentInclude,
   });
 
-  if (input.startAt && updated.status !== "CANCELLED" && updated.status !== "COMPLETED") {
+  if (input.startAt && updated.status !== "COMPLETED") {
     cancelScheduledReminder(id);
     if (input.sendWhatsApp !== false) {
       scheduleReminder(id, startAt);
@@ -474,7 +474,7 @@ export async function getAvailableSlots(
   const existingAppts = await prisma.appointment.findMany({
     where: {
       manicuristId,
-      status: { in: ["PENDING", "CONFIRMED"] },
+      status: { in: ["PENDING"] },
       startAt: { gte: dayStart, lte: dayEnd },
     },
     select: { startAt: true, endAt: true },
@@ -553,14 +553,14 @@ export async function getNextAvailableSlots(
 // ─── Auto-complete ────────────────────────────────────────────────────────────
 
 /**
- * Marks any PENDING or CONFIRMED appointment whose endAt is in the past as COMPLETED.
+ * Marks any PENDING appointment whose endAt is in the past as COMPLETED.
  * Called periodically by the worker (every 60 s).
  * Returns the number of rows updated.
  */
 export async function autoCompleteExpiredAppointments(): Promise<number> {
   const result = await prisma.appointment.updateMany({
     where: {
-      status: { in: ["PENDING", "CONFIRMED"] },
+      status: "PENDING",
       endAt: { lt: now() },
     },
     data: { status: "COMPLETED" },

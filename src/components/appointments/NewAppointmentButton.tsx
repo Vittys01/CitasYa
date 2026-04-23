@@ -84,7 +84,7 @@ const schema = z.object({
   manicuristId: z.string().min(1),
   startAt:      z.string().min(1),
   notes:        z.string().optional(),
-  status:       z.enum(["PENDING", "CONFIRMED", "COMPLETED", "CANCELLED"]).optional(),
+  status:       z.enum(["PENDING", "COMPLETED"]).optional(),
 }).refine((d) => d.clientId && d.manicuristId && d.startAt, { message: "Completá todos los campos" });
 
 type FormData = z.infer<typeof schema>;
@@ -120,6 +120,24 @@ export default function NewAppointmentButton({
   const [clientsList, setClientsList] = useState<Client[]>(clients);
   // Sync if parent re-renders with updated clients (e.g. server refresh)
   useEffect(() => { setClientsList(clients); }, [clients]);
+
+  // ── Client autocomplete ─────────────────────────────────────────────────────
+  const [clientFilter, setClientFilter] = useState("");
+  const [clientShowDropdown, setClientShowDropdown] = useState(false);
+  const [selectedClientId, setSelectedClientId] = useState("");
+  const filteredClients = clientFilter
+    ? clientsList.filter((c) => c.name.toLowerCase().startsWith(clientFilter.toLowerCase()))
+    : clientsList.slice(0, 10);
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest(".client-autocomplete")) {
+        setClientShowDropdown(false);
+      }
+    };
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, []);
 
   // ── New-client inline form ────────────────────────────────────────────────────
   const [showNewClient, setShowNewClient] = useState(false);
@@ -326,6 +344,9 @@ export default function NewAppointmentButton({
     setPickerDate("");
     setSlotOptions([]);
     setError(null);
+    setClientFilter("");
+    setSelectedClientId("");
+    setClientShowDropdown(false);
     setShowNewClient(false);
     setNewClient({ name: "", phone: "", email: "", notes: "" });
     setNewClientError("");
@@ -393,6 +414,8 @@ export default function NewAppointmentButton({
     setApptDurationOverride(blockMins);
     setApptDurationDisplay(undefined);
     setValue("clientId", a.clientId, { shouldValidate: true });
+    setSelectedClientId(a.clientId);
+    setClientFilter(a.client?.name ?? "");
     setValue("manicuristId", a.manicuristId, { shouldValidate: true });
     setValue("notes", a.notes ?? "", { shouldValidate: false });
     setValue("status", a.status, { shouldValidate: false });
@@ -574,30 +597,64 @@ export default function NewAppointmentButton({
                 </h3>
 
                 {/* Existing client selector */}
-                {!showNewClient && (
-                  <div className="space-y-2">
-                    <label className={labelCls}>{g(settings, "form.clientLabel", "Cliente")}</label>
-                    <select {...register("clientId")} className={inputCls}>
-                      <option value="">{g(settings, "form.selectClient", "Seleccionar cliente...")}</option>
-                      {clientsList.map((c) => (
-                        <option key={c.id} value={c.id}>{c.name} — {c.phone}</option>
-                      ))}
-                    </select>
-                    {errors.clientId && (
-                      <p className="text-red-500 text-xs mt-1">
-                        {g(settings, "validation.selectClient", "Seleccioná un cliente")}
-                      </p>
+              {!showNewClient && (
+                <div className="space-y-2">
+                  <label className={labelCls}>{g(settings, "form.clientLabel", "Cliente")}</label>
+                  <div className="relative client-autocomplete">
+                    <input
+                      type="text"
+                      placeholder={g(settings, "form.selectClient", "Escribí para buscar...")}
+                      value={clientFilter}
+                      onChange={(e) => setClientFilter(e.target.value)}
+                      onFocus={() => setClientShowDropdown(true)}
+                      className={inputCls}
+                    />
+                    {clientFilter && (
+                      <button
+                        type="button"
+                        onClick={() => { setClientFilter(""); setSelectedClientId(""); }}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-earth-muted hover:text-earth"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">close</span>
+                      </button>
                     )}
-                    <button
-                      type="button"
-                      onClick={() => setShowNewClient(true)}
-                      className="flex items-center gap-1.5 text-xs text-primary-dark hover:text-primary font-semibold mt-1 transition-colors"
-                    >
-                      <span className="material-symbols-outlined text-[14px]">person_add</span>
-                      Crear cliente nuevo
-                    </button>
+                    {clientShowDropdown && filteredClients.length > 0 && (
+                      <div className="absolute z-20 w-full mt-1 bg-white border border-[#D7CCC8] rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                        {filteredClients.map((c) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedClientId(c.id);
+                              setClientFilter(c.name);
+                              setClientShowDropdown(false);
+                              setValue("clientId", c.id, { shouldValidate: true });
+                            }}
+                            className="w-full px-3 py-2 text-left text-sm hover:bg-primary/10 flex items-center justify-between"
+                          >
+                            <span className="font-medium text-earth">{c.name}</span>
+                            <span className="text-xs text-earth-muted">{c.phone}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )}
+                  <input type="hidden" {...register("clientId", { value: selectedClientId })} />
+                  {errors.clientId && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {g(settings, "validation.selectClient", "Seleccioná un cliente")}
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowNewClient(true)}
+                    className="flex items-center gap-1.5 text-xs text-primary-dark hover:text-primary font-semibold mt-1 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">person_add</span>
+                    Crear cliente nuevo
+                  </button>
+                </div>
+              )}
 
                 {/* Inline new-client form */}
                 {showNewClient && (

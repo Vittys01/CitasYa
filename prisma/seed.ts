@@ -132,8 +132,6 @@ async function main() {
     { key: "common.cancelling",   value: "Cancelando..." },
     { key: "action.cancelAppointment",  value: "Cancelar turno" },
     { key: "status.PENDING",   value: "Pendiente" },
-    { key: "status.CONFIRMED", value: "Confirmado" },
-    { key: "status.CANCELLED", value: "Cancelado" },
     { key: "status.COMPLETED", value: "Completado" },
     { key: "common.active",   value: "Activo" },
     { key: "common.archived", value: "Archivado" },

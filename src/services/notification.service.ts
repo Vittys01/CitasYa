@@ -96,11 +96,6 @@ export async function processNotification(
     return;
   }
 
-  if (appointment.status === "CANCELLED" && type !== "CANCELLATION") {
-    console.info(`[Notification] Skipping ${type} for cancelled appointment ${appointmentId}`);
-    return;
-  }
-
   let notification = await prisma.notification.findFirst({
     where: { appointmentId, type },
   });

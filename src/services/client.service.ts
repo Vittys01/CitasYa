@@ -104,7 +104,7 @@ export async function deleteClient(id: string): Promise<void> {
     where: {
       clientId: id,
       startAt: { gt: now() },
-      status: { in: ["PENDING", "CONFIRMED"] },
+      status: "PENDING",
     },
   });
 

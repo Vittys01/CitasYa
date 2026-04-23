@@ -48,7 +48,6 @@ export async function getDashboardStats(
 
   return {
     todayAppointments: todayAppointments.reduce((s, g) => s + g._count._all, 0),
-    confirmedToday: statusMap["CONFIRMED"] ?? 0,
     pendingToday: statusMap["PENDING"] ?? 0,
     completedToday: statusMap["COMPLETED"] ?? 0,
     revenueToday: Number(revenueToday._sum.price ?? 0),

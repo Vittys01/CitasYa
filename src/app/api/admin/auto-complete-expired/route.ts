@@ -2,7 +2,7 @@
  * POST /api/admin/auto-complete-expired
  * Endpoint para completar manualmente citas expiradas (respaldo del worker)
  *
- * Este endpoint completa todas las citas PENDING o CONFIRMED que ya pasaron su fecha/hora
+ * Este endpoint completa todas las citas PENDING que ya pasaron su fecha/hora
  * marcándolas como COMPLETED. Es útil como respaldo si el worker no está corriendo.
  */
 

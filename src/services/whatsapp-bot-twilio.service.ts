@@ -1716,7 +1716,7 @@ async function getOrCreateClient(
     include: {
       appointments: {
         where: {
-          status: { in: ["PENDING", "CONFIRMED"] },
+          status: { in: ["PENDING"] },
           startAt: { gte: now() },
         },
         take: 5,
@@ -1736,7 +1736,7 @@ async function getOrCreateClient(
       include: {
         appointments: {
           where: {
-            status: { in: ["PENDING", "CONFIRMED"] },
+            status: { in: ["PENDING"] },
             startAt: { gte: now() },
           },
           take: 5,
@@ -1760,7 +1760,7 @@ async function getActiveAppointmentsForClient(
     where: {
       businessId,
       clientId,
-      status: { in: ["PENDING", "CONFIRMED"] },
+      status: { in: ["PENDING"] },
       startAt: { gte: now() },
     },
     include: {

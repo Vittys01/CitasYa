@@ -5,9 +5,7 @@ import { cn } from "@/lib/utils";
 
 const statusStyles: Record<string, { icon: string; cls: string }> = {
   PENDING:   { icon: "pending",      cls: "bg-[#FFF8E1] text-amber-700 border-amber-200" },
-  CONFIRMED: { icon: "check_circle", cls: "bg-[#E8F5E9] text-emerald-700 border-emerald-200" },
   COMPLETED: { icon: "task_alt",     cls: "bg-[#EFEBE9] text-earth-light border-[#D7CCC8]" },
-  CANCELLED: { icon: "cancel",       cls: "bg-stone-50 text-stone-400 border-stone-200" },
 };
 
 const get = (s: Record<string, string> | undefined, k: string, fallback: string) => (s && s[k]) ?? fallback;
@@ -18,7 +16,7 @@ interface TodayAppointmentsProps {
 }
 
 export default function TodayAppointments({ appointments, settings }: TodayAppointmentsProps) {
-  const active = appointments.filter((a) => a.status !== "CANCELLED");
+  const active = appointments;
   const title = get(settings, "dashboard.todayTitle", "Turnos de hoy");
   const sub = get(settings, "dashboard.todaySub", "activos");
   const statusLabel = (status: string) => get(settings, `status.${status}`, status);

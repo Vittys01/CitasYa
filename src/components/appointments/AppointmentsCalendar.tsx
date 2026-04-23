@@ -61,16 +61,12 @@ interface CalendarProps {
 
 const apptStyle: Record<string, { bg: string; border: string; text: string; badge: string }> = {
   PENDING:   { bg: "bg-[#f4ece4]",   border: "border-[#c7b299]", text: "text-[#5c4030]", badge: "bg-[#e8e0d5] text-[#8c7352]" },
-  CONFIRMED: { bg: "bg-[#f0ebd8]",   border: "border-[#a68a64]", text: "text-[#4a3b28]", badge: "bg-[#e8e0d5] text-[#8c7352]" },
   COMPLETED: { bg: "bg-[#ede4d8]",   border: "border-[#8c7352]", text: "text-[#3e2e1e]", badge: "bg-[#d6cbb6] text-[#5c4d3c]" },
-  CANCELLED: { bg: "bg-stone-50",     border: "border-stone-300", text: "text-stone-400",  badge: "bg-stone-100 text-stone-400" },
 };
 
 const defaultStatusLabel: Record<string, string> = {
   PENDING:   "Pendiente",
-  CONFIRMED: "Confirmado",
   COMPLETED: "Completado",
-  CANCELLED: "Cancelado",
 };
 
 // ─── Helper: pixel offset from top of grid ────────────────────────────────────
@@ -172,7 +168,7 @@ export default function AppointmentsCalendar({
 }: CalendarProps) {
   const router = useRouter();
   const statusLabel = (status: string) => (settings && settings[`status.${status}`]) ?? defaultStatusLabel[status] ?? status;
-  type StatusFilter = "all" | "PENDING" | "CONFIRMED" | "COMPLETED" | "CANCELLED";
+  type StatusFilter = "all" | "PENDING" | "COMPLETED";
 
   const [view, setView]           = useState<"month" | "week" | "day">("month");
   const [selectedDay, setSelectedDay] = useState(() => now());
@@ -294,7 +290,7 @@ export default function AppointmentsCalendar({
   const handleApptDrop = useCallback(
     async (appointmentId: string, targetStartAt: Date) => {
       const appt = displayAppointments.find((a) => a.id === appointmentId);
-      if (!appt || appt.status === "CANCELLED" || appt.status === "COMPLETED") return;
+      if (!appt || appt.status === "COMPLETED") return;
       const newStart = new Date(targetStartAt);
       const durationMs = new Date(appt.endAt).getTime() - new Date(appt.startAt).getTime();
       const newEnd = new Date(newStart.getTime() + durationMs);
@@ -416,9 +412,7 @@ export default function AppointmentsCalendar({
 
   const statusShort: Record<string, string> = {
     PENDING: "Pend.",
-    CONFIRMED: "Conf.",
     COMPLETED: "Compl.",
-    CANCELLED: "Canc.",
   };
 
   return (
@@ -524,7 +518,7 @@ export default function AppointmentsCalendar({
                   </div>
                 )}
               </div>
-              {selectedAppointment.status !== "CANCELLED" && selectedAppointment.status !== "COMPLETED" && onEditAppointment && (
+              {selectedAppointment.status === "PENDING" && onEditAppointment && (
                 <button
                   type="button"
                   onClick={() => {
@@ -537,30 +531,32 @@ export default function AppointmentsCalendar({
                   {(settings && settings["action.editAppointment"]) ?? "Editar turno"}
                 </button>
               )}
-              {/* Cancel appointment — only for pending/confirmed */}
-              {selectedAppointment.status !== "CANCELLED" && selectedAppointment.status !== "COMPLETED" && (
+              {/* Complete appointment - only for PENDING */}
+              {selectedAppointment.status === "PENDING" && (
                 <div className="pt-4 mt-4 border-t border-[#e6d5c3]">
                   {cancelError && <p className="text-red-500 text-xs mb-2">{cancelError}</p>}
                   <button
                     type="button"
                     onClick={async () => {
-                      if (!confirm((settings && settings["confirm.cancelAppointment"]) ?? "¿Cancelar este turno?")) return;
+                      if (!confirm((settings && settings["confirm.completeAppointment"]) ?? "¿Marcar este turno como completado?")) return;
                       setCancelError(null);
                       setCancelling(true);
                       const res = await fetch(`/api/appointments/${selectedAppointment.id}`, {
-                        method: "DELETE",
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ status: "COMPLETED" }),
                       });
                       setCancelling(false);
                       if (!res.ok) {
                         const j = await res.json();
-                        setCancelError(j.error?.message ?? "Error al cancelar");
+                        setCancelError(j.error?.message ?? "Error al completar");
                         return;
                       }
-                      setAppointments((prev) => prev.filter((a) => a.id !== selectedAppointment.id));
+                      setAppointments((prev) => prev.map((a) => a.id === selectedAppointment.id ? { ...a, status: "COMPLETED" } : a));
                       setFetchedByWeek((prev) => {
                         const next = { ...prev };
                         for (const key of Object.keys(next)) {
-                          next[key] = next[key].filter((a) => a.id !== selectedAppointment.id);
+                          next[key] = next[key].map((a) => a.id === selectedAppointment.id ? { ...a, status: "COMPLETED" } : a);
                         }
                         return next;
                       });
@@ -568,10 +564,10 @@ export default function AppointmentsCalendar({
                       router.refresh();
                     }}
                     disabled={cancelling}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-medium border border-red-200 rounded-lg text-red-600 hover:bg-red-50 transition disabled:opacity-50"
+                    className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-medium border border-emerald-200 rounded-lg text-emerald-600 hover:bg-emerald-50 transition disabled:opacity-50"
                   >
-                    <span className="material-symbols-outlined text-[18px]">cancel</span>
-                    {cancelling ? ((settings && settings["common.cancelling"]) ?? "Cancelando...") : ((settings && settings["action.cancelAppointment"]) ?? "Cancelar turno")}
+                    <span className="material-symbols-outlined text-[18px]">check_circle</span>
+                    {cancelling ? ((settings && settings["common.saving"]) ?? "Guardando...") : ((settings && settings["action.completeAppointment"]) ?? "Completar turno")}
                   </button>
                 </div>
               )}
@@ -735,9 +731,7 @@ export default function AppointmentsCalendar({
               [
                 { value: "all" as const, label: (settings && settings["calendar.filter.allStatus"]) ?? "Todos" },
                 { value: "PENDING" as const, label: statusLabel("PENDING") },
-                { value: "CONFIRMED" as const, label: statusLabel("CONFIRMED") },
                 { value: "COMPLETED" as const, label: statusLabel("COMPLETED") },
-                { value: "CANCELLED" as const, label: statusLabel("CANCELLED") },
               ] as const
             ).map(({ value, label }) => (
               <button
@@ -1279,7 +1273,7 @@ function DayColumn({
         const leftPct      = isSideBySide ? 4 + colIndex * (92 / totalCols) : 4;
         const widthPct     = isSideBySide ? 92 / totalCols - 0.5 : 92;
 
-        const canDrag = appt.status !== "CANCELLED" && appt.status !== "COMPLETED" && onApptDrop;
+        const canDrag = appt.status === "PENDING" && onApptDrop;
 
         return (
           <button

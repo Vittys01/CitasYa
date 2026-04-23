@@ -138,7 +138,6 @@ export interface AvailabilitySlot {
 
 export interface DashboardStats {
   todayAppointments: number;
-  confirmedToday: number;
   pendingToday: number;
   completedToday: number;
   revenueToday: number;

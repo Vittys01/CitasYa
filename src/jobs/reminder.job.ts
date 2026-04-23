@@ -22,7 +22,7 @@ export async function reconcileReminders(): Promise<void> {
   const appointments = await prisma.appointment.findMany({
     where: {
       startAt: { gte: windowStart, lte: windowEnd },
-      status: { in: ["PENDING", "CONFIRMED"] },
+      status: "PENDING",
       notifications: {
         none: {
           type: "REMINDER_24H",

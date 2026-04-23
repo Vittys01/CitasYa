@@ -13,7 +13,7 @@ function buildCards(stats: DashboardStats, settings: Record<string, string> | un
     {
       label:    get(settings, "stats.todayLabel", "Turnos hoy"),
       value:    stats.todayAppointments.toString(),
-      sub:      `${stats.confirmedToday} ${get(settings, "stats.confirmedSub", "confirmados")} · ${stats.pendingToday} ${get(settings, "stats.pendingSub", "pendientes")}`,
+      sub:      `${stats.pendingToday} ${get(settings, "stats.pendingSub", "pendientes")} · ${stats.completedToday} ${get(settings, "stats.completedSub", "completados")}`,
       icon:     "calendar_today",
       iconBg:   "bg-[#F3F0FF]",
       iconColor:"text-[#7C5CBF]",
