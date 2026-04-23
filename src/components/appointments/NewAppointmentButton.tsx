@@ -160,6 +160,24 @@ export default function NewAppointmentButton({
 
   // ── Selected services (múltiples + duración personalizable) ────────────────────
   const [selectedServices, setSelectedServices] = useState<SelectedService[]>([]);
+  const [serviceFilter, setServiceFilter] = useState("");
+  const [serviceShowDropdown, setServiceShowDropdown] = useState(false);
+
+  const filteredServices = serviceFilter
+    ? services.filter((s) => s.name.toLowerCase().includes(serviceFilter.toLowerCase()))
+    : services;
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest(".service-autocomplete")) {
+        setServiceShowDropdown(false);
+      }
+    };
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, []);
+
   const totalDuration = selectedServices.reduce((sum, item) => {
     const svc = services.find((s) => s.id === item.serviceId);
     return sum + lineDurationMinutes(item, svc);
@@ -355,6 +373,8 @@ export default function NewAppointmentButton({
   function openDrawer() {
     reset();
     setSelectedServices([]);
+    setServiceFilter("");
+    setServiceShowDropdown(false);
     setPriceOverride(null);
     setPriceDisplay(undefined);
     setApptDurationOverride(null);
@@ -1008,6 +1028,49 @@ export default function NewAppointmentButton({
                         </option>
                       ))}
                   </select>
+                  <div className="relative service-autocomplete">
+                    <input
+                      type="text"
+                      placeholder={g(settings, "form.searchService", "Buscar servicio...")}
+                      value={serviceFilter}
+                      onChange={(e) => {
+                        setServiceFilter(e.target.value);
+                        setServiceShowDropdown(true);
+                      }}
+                      onFocus={() => setServiceShowDropdown(true)}
+                      className={inputCls}
+                    />
+                    {serviceFilter && (
+                      <button
+                        type="button"
+                        onClick={() => { setServiceFilter(""); }}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-earth-muted hover:text-earth"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">close</span>
+                      </button>
+                    )}
+                    {serviceShowDropdown && filteredServices.filter((s) => !selectedServices.some((x) => x.serviceId === s.id)).length > 0 && (
+                      <div className="absolute z-20 w-full mt-1 bg-white border border-[#D7CCC8] rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                        {filteredServices
+                          .filter((s) => !selectedServices.some((x) => x.serviceId === s.id))
+                          .map((s) => (
+                            <button
+                              key={s.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedServices((prev) => [...prev, { serviceId: s.id }]);
+                                setServiceFilter("");
+                                setServiceShowDropdown(false);
+                              }}
+                              className="w-full px-3 py-2 text-left text-sm hover:bg-primary/10 flex items-center justify-between"
+                            >
+                              <span className="font-medium text-earth">{s.name}</span>
+                              <span className="text-xs text-earth-muted">{s.duration} min</span>
+                            </button>
+                          ))}
+                      </div>
+                    )}
+                  </div>
                   {selectedServices.length > 0 && (
                     <div className="bg-primary/5 rounded-xl border border-primary/20 p-4 space-y-3">
                       <div className="flex items-center justify-between gap-3 flex-wrap">
