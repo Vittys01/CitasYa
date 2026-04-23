@@ -202,6 +202,9 @@ export default function NewAppointmentButton({
   const [timeEntryMode, setTimeEntryMode] = useState<"slots" | "manual">("slots");
   const [manualHour, setManualHour] = useState("");
   const [manualMinute, setManualMinute] = useState("");
+  const [endHour, setEndHour] = useState("");
+  const [endMinute, setEndMinute] = useState("");
+  const [useEndTime, setUseEndTime] = useState(false);
 
   const loadSlotsNext = useCallback(
     async (serviceId: string, duration: number, manicuristId: string, signal: AbortSignal) => {
@@ -370,6 +373,9 @@ export default function NewAppointmentButton({
     setTimeEntryMode("slots");
     setManualHour("");
     setManualMinute("");
+    setEndHour("");
+    setEndMinute("");
+    setUseEndTime(false);
     if (!isControlled) setInternalOpen(true);
   }
 
@@ -440,6 +446,10 @@ export default function NewAppointmentButton({
     setTimeEntryMode("manual");
     setManualHour(format(d, "HH"));
     setManualMinute(format(d, "mm"));
+    const dEnd = toCanaryTimezone(new Date(a.endAt as string));
+    setEndHour(format(dEnd, "HH"));
+    setEndMinute(format(dEnd, "mm"));
+    setUseEndTime(true);
     setManicuristFilter(lockedManicuristId ?? a.manicuristId);
     const iso = typeof a.startAt === "string" ? a.startAt : new Date(a.startAt).toISOString();
     setValue("startAt", iso, { shouldValidate: false });
@@ -470,6 +480,25 @@ export default function NewAppointmentButton({
   async function onSubmit(data: FormData) {
     setError(null);
     let finalStartAt = data.startAt;
+    let finalDuration = effectiveSlotDuration;
+
+    // Si el usuario ingresa hora de finalización, calcular duración
+    if (useEndTime && pickerDate && endHour && endMinute) {
+      const startH = parseInt(manualHour, 10);
+      const startM = parseInt(manualMinute, 10);
+      const endH = parseInt(endHour, 10);
+      const endM = parseInt(endMinute, 10);
+      if (!isNaN(startH) && !isNaN(startM) && !isNaN(endH) && !isNaN(endM)) {
+        const startMins = startH * 60 + startM;
+        const endMins = endH * 60 + endM;
+        let diff = endMins - startMins;
+        if (diff < 0) diff += 24 * 60; // siguiente día
+        if (diff >= 5 && diff <= 1440) {
+          finalDuration = diff;
+        }
+      }
+    }
+
     if (timeEntryMode === "manual") {
       if (!pickerDate) {
         setError(g(settings, "validation.fillAll", "Seleccioná una fecha para usar hora manual."));
@@ -489,11 +518,14 @@ export default function NewAppointmentButton({
         return sum + (s.durationMinutes ?? svc?.duration ?? 0);
       }, 0);
 
+      // Usar la duración final calculada (puede ser de hora de finalización)
+      const durationToCheck = useEndTime ? finalDuration : totalMins;
+
       if (!editingAppointment) {
-        const endTime = new Date(new Date(finalStartAt).getTime() + totalMins * 60000);
+        const endTime = new Date(new Date(finalStartAt).getTime() + durationToCheck * 60000);
 
         const checkRes = await fetch(
-          `/api/appointments/availability?manicuristId=${data.manicuristId}&date=${dateStr}&serviceId=${selectedServices[0]?.serviceId ?? ""}&duration=${totalMins}`
+          `/api/appointments/availability?manicuristId=${data.manicuristId}&date=${dateStr}&serviceId=${selectedServices[0]?.serviceId ?? ""}&duration=${durationToCheck}`
         );
         const checkData = await checkRes.json();
         const slots = (checkData?.data ?? []) as { start: string; end: string }[];
@@ -505,7 +537,7 @@ export default function NewAppointmentButton({
           const nextMsg = nextSlot
             ? `. Próximo disponible: ${formatHour(new Date(nextSlot.start))}`
             : ". No hay horarios disponibles este día.";
-          setError(`El turno dura ${totalMins} minutos y no hay disponibilidad en ese horario${nextMsg}`);
+          setError(`El turno dura ${durationToCheck} minutos y no hay disponibilidad en ese horario${nextMsg}`);
           return;
         }
       }
@@ -541,7 +573,7 @@ export default function NewAppointmentButton({
         startAt: new Date(finalStartAt).toISOString(),
         notes: data.notes,
         price: priceForSubmit,
-        totalDurationMinutes: effectiveSlotDuration,
+        totalDurationMinutes: useEndTime ? finalDuration : effectiveSlotDuration,
         sendWhatsApp,
         ...(editingAppointment?.id && data.status ? { status: data.status } : {}),
       };
@@ -1173,33 +1205,94 @@ export default function NewAppointmentButton({
                   </div>
                   {/* Hora manual */}
                   {timeEntryMode === "manual" && (
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1">
-                        <label className={labelCls}>Hora</label>
-                        <input
-                          type="number"
-                          min={0}
-                          max={23}
-                          value={manualHour}
-                          onChange={(e) => setManualHour(e.target.value.replace(/\D/g, "").slice(0, 2))}
-                          placeholder="00"
-                          className={inputCls}
-                        />
+                    <>
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1">
+                          <label className={labelCls}>Hora</label>
+                          <input
+                            type="number"
+                            min={0}
+                            max={23}
+                            value={manualHour}
+                            onChange={(e) => setManualHour(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                            placeholder="00"
+                            className={inputCls}
+                          />
+                        </div>
+                        <span className="text-earth font-medium mt-5">:</span>
+                        <div className="flex-1">
+                          <label className={labelCls}>Minutos</label>
+                          <input
+                            type="number"
+                            min={0}
+                            max={59}
+                            value={manualMinute}
+                            onChange={(e) => setManualMinute(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                            placeholder="00"
+                            className={inputCls}
+                          />
+                        </div>
                       </div>
-                      <span className="text-earth font-medium mt-5">:</span>
-                      <div className="flex-1">
-                        <label className={labelCls}>Minutos</label>
-                        <input
-                          type="number"
-                          min={0}
-                          max={59}
-                          value={manualMinute}
-                          onChange={(e) => setManualMinute(e.target.value.replace(/\D/g, "").slice(0, 2))}
-                          placeholder="00"
-                          className={inputCls}
-                        />
+                      {/* Hora de finalizar */}
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setUseEndTime((v) => !v)}
+                          className={cn(
+                            "px-3 py-1.5 text-xs font-medium rounded-lg transition",
+                            useEndTime
+                              ? "bg-emerald-600 text-white"
+                              : "bg-[#e6d5c3] text-earth hover:bg-[#d7ccc8]"
+                          )}
+                        >
+                          {useEndTime ? "Hora fin activada" : "Establecer hora fin"}
+                        </button>
                       </div>
-                    </div>
+                      {useEndTime && (
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1">
+                            <label className={labelCls}>Hora fin</label>
+                            <input
+                              type="number"
+                              min={0}
+                              max={23}
+                              value={endHour}
+                              onChange={(e) => setEndHour(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                              placeholder="00"
+                              className={inputCls}
+                            />
+                          </div>
+                          <span className="text-earth font-medium mt-5">:</span>
+                          <div className="flex-1">
+                            <label className={labelCls}>Minutos fin</label>
+                            <input
+                              type="number"
+                              min={0}
+                              max={59}
+                              value={endMinute}
+                              onChange={(e) => setEndMinute(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                              placeholder="00"
+                              className={inputCls}
+                            />
+                          </div>
+                          {endHour && endMinute && manualHour && manualMinute && (
+                            <div className="text-xs text-earth-muted self-end pb-2">
+                              ({(() => {
+                                const startH = parseInt(manualHour, 10);
+                                const startM = parseInt(manualMinute, 10);
+                                const endH = parseInt(endHour, 10);
+                                const endM = parseInt(endMinute, 10);
+                                const startMins = startH * 60 + startM;
+                                const endMins = endH * 60 + endM;
+                                let diff = endMins - startMins;
+                                if (diff < 0) diff += 24 * 60;
+                                return diff;
+                              })()} min)
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
