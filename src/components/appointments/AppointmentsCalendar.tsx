@@ -61,12 +61,16 @@ interface CalendarProps {
 
 const apptStyle: Record<string, { bg: string; border: string; text: string; badge: string }> = {
   PENDING:   { bg: "bg-[#f4ece4]",   border: "border-[#c7b299]", text: "text-[#5c4030]", badge: "bg-[#e8e0d5] text-[#8c7352]" },
+  CONFIRMED: { bg: "bg-[#f0ebd8]",   border: "border-[#a68a64]", text: "text-[#4a3b28]", badge: "bg-[#e8e0d5] text-[#8c7352]" },
   COMPLETED: { bg: "bg-[#ede4d8]",   border: "border-[#8c7352]", text: "text-[#3e2e1e]", badge: "bg-[#d6cbb6] text-[#5c4d3c]" },
+  CANCELLED: { bg: "bg-stone-50",     border: "border-stone-300", text: "text-stone-400",  badge: "bg-stone-100 text-stone-400" },
 };
 
 const defaultStatusLabel: Record<string, string> = {
   PENDING:   "Pendiente",
+  CONFIRMED: "Confirmado",
   COMPLETED: "Completado",
+  CANCELLED: "Cancelado",
 };
 
 // ─── Helper: pixel offset from top of grid ────────────────────────────────────
@@ -168,7 +172,7 @@ export default function AppointmentsCalendar({
 }: CalendarProps) {
   const router = useRouter();
   const statusLabel = (status: string) => (settings && settings[`status.${status}`]) ?? defaultStatusLabel[status] ?? status;
-  type StatusFilter = "all" | "PENDING" | "COMPLETED";
+  type StatusFilter = "all" | "PENDING" | "CONFIRMED" | "COMPLETED" | "CANCELLED";
 
   const [view, setView]           = useState<"month" | "week" | "day">("month");
   const [selectedDay, setSelectedDay] = useState(() => now());
@@ -571,6 +575,44 @@ export default function AppointmentsCalendar({
                   </button>
                 </div>
               )}
+              {/* Cancel/delete appointment - only for PENDING and CONFIRMED */}
+              {selectedAppointment.status !== "CANCELLED" && selectedAppointment.status !== "COMPLETED" && (
+                <div className="pt-4 mt-4 border-t border-[#e6d5c3]">
+                  {cancelError && <p className="text-red-500 text-xs mb-2">{cancelError}</p>}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!confirm((settings && settings["confirm.cancelAppointment"]) ?? "¿Cancelar este turno?")) return;
+                      setCancelError(null);
+                      setCancelling(true);
+                      const res = await fetch(`/api/appointments/${selectedAppointment.id}`, {
+                        method: "DELETE",
+                      });
+                      setCancelling(false);
+                      if (!res.ok) {
+                        const j = await res.json();
+                        setCancelError(j.error?.message ?? "Error al cancelar");
+                        return;
+                      }
+                      setAppointments((prev) => prev.filter((a) => a.id !== selectedAppointment.id));
+                      setFetchedByWeek((prev) => {
+                        const next = { ...prev };
+                        for (const key of Object.keys(next)) {
+                          next[key] = next[key].filter((a) => a.id !== selectedAppointment.id);
+                        }
+                        return next;
+                      });
+                      setSelectedAppointment(null);
+                      router.refresh();
+                    }}
+                    disabled={cancelling}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-medium border border-red-200 rounded-lg text-red-600 hover:bg-red-50 transition disabled:opacity-50"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">cancel</span>
+                    {cancelling ? ((settings && settings["common.cancelling"]) ?? "Cancelando...") : ((settings && settings["action.cancelAppointment"]) ?? "Cancelar turno")}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -731,7 +773,9 @@ export default function AppointmentsCalendar({
               [
                 { value: "all" as const, label: (settings && settings["calendar.filter.allStatus"]) ?? "Todos" },
                 { value: "PENDING" as const, label: statusLabel("PENDING") },
+                { value: "CONFIRMED" as const, label: statusLabel("CONFIRMED") },
                 { value: "COMPLETED" as const, label: statusLabel("COMPLETED") },
+                { value: "CANCELLED" as const, label: statusLabel("CANCELLED") },
               ] as const
             ).map(({ value, label }) => (
               <button

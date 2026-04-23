@@ -216,6 +216,7 @@ export default function NewAppointmentButton({
         const slots: SlotOption[] = data?.data ?? [];
         setSlotOptions(slots);
         const edit = editingRef.current;
+        const hasExistingSelection = !!pickerDate || !!initialPrefill?.startAt;
         if (slots.length > 0) {
           if (edit?.id) {
             const want = new Date(edit.startAt as string).getTime();
@@ -227,7 +228,7 @@ export default function NewAppointmentButton({
               setValue("startAt", new Date(edit.startAt as string).toISOString(), { shouldValidate: false });
               setValue("manicuristId", edit.manicuristId, { shouldValidate: false });
             }
-          } else {
+          } else if (!hasExistingSelection) {
             setValue("startAt", slots[0].start, { shouldValidate: false });
             setValue("manicuristId", slots[0].manicuristId, { shouldValidate: false });
           }
@@ -278,6 +279,7 @@ export default function NewAppointmentButton({
         if (signal.aborted) return;
         setSlotOptions(allSlots);
         const edit = editingRef.current;
+        const hasExistingSelection = !!pickerDate || !!initialPrefill?.startAt;
         if (allSlots.length > 0) {
           if (edit?.id) {
             const want = new Date(edit.startAt as string).getTime();
@@ -289,7 +291,7 @@ export default function NewAppointmentButton({
               setValue("startAt", new Date(edit.startAt as string).toISOString(), { shouldValidate: false });
               setValue("manicuristId", edit.manicuristId, { shouldValidate: false });
             }
-          } else {
+          } else if (!hasExistingSelection) {
             setValue("startAt", allSlots[0].start, { shouldValidate: false });
             setValue("manicuristId", allSlots[0].manicuristId, { shouldValidate: false });
           }
@@ -330,7 +332,12 @@ export default function NewAppointmentButton({
   function handleSlotChange(start: string) {
     setValue("startAt", start, { shouldValidate: false });
     const slot = slotOptions.find((s) => s.start === start);
-    if (slot) setValue("manicuristId", slot.manicuristId, { shouldValidate: false });
+    if (slot) {
+      setValue("manicuristId", slot.manicuristId, { shouldValidate: false });
+      if (slot.manicuristId !== manicuristFilter) {
+        setManicuristFilter(slot.manicuristId);
+      }
+    }
   }
 
   function openDrawer() {
