@@ -1328,7 +1328,7 @@ function DayColumn({
             )}
             <div className="flex items-center justify-between mt-0.5 gap-1 flex-shrink-0">
               <span className="text-[10px] opacity-60 whitespace-nowrap tabular-nums">
-                {format(start, "HH:mm")} – {format(end, "HH:mm")}
+                {formatHour(start)} – {formatHour(end)}
               </span>
               {showManiChip && !short && (
                 <span
@@ -1367,7 +1367,7 @@ function CurrentTimeLine({ gridStartHour, pxPerHour }: { gridStartHour: number; 
     >
       <div className="w-16 text-right pr-2">
         <span className="text-[10px] font-bold text-primary-dark bg-[#FFFDF5] px-1">
-          {format(now(), "HH:mm")}
+          {formatHour(now())}
         </span>
       </div>
       <div className="flex-1 h-px bg-primary-dark relative">
