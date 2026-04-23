@@ -225,14 +225,19 @@ export default function NewAppointmentButton({
               setValue("startAt", match.start, { shouldValidate: false });
               setValue("manicuristId", match.manicuristId, { shouldValidate: false });
             } else {
-              setValue("startAt", new Date(edit.startAt as string).toISOString(), { shouldValidate: false });
+              setTimeEntryMode("manual");
+              const originalDate = new Date(edit.startAt as string);
+              setPickerDate(format(originalDate, "yyyy-MM-dd"));
+              setManualHour(format(originalDate, "HH"));
+              setManualMinute(format(originalDate, "mm"));
+              setValue("startAt", edit.startAt as string, { shouldValidate: false });
               setValue("manicuristId", edit.manicuristId, { shouldValidate: false });
             }
           } else if (!hasExistingSelection) {
             setValue("startAt", slots[0].start, { shouldValidate: false });
             setValue("manicuristId", slots[0].manicuristId, { shouldValidate: false });
           }
-        } else {
+        } else if (!edit?.id) {
           setValue("startAt", "", { shouldValidate: false });
           setValue("manicuristId", "", { shouldValidate: false });
         }
@@ -288,14 +293,18 @@ export default function NewAppointmentButton({
               setValue("startAt", match.start, { shouldValidate: false });
               setValue("manicuristId", match.manicuristId, { shouldValidate: false });
             } else {
-              setValue("startAt", new Date(edit.startAt as string).toISOString(), { shouldValidate: false });
+              setTimeEntryMode("manual");
+              const originalDate = new Date(edit.startAt as string);
+              setManualHour(format(originalDate, "HH"));
+              setManualMinute(format(originalDate, "mm"));
+              setValue("startAt", edit.startAt as string, { shouldValidate: false });
               setValue("manicuristId", edit.manicuristId, { shouldValidate: false });
             }
           } else if (!hasExistingSelection) {
             setValue("startAt", allSlots[0].start, { shouldValidate: false });
             setValue("manicuristId", allSlots[0].manicuristId, { shouldValidate: false });
           }
-        } else {
+        } else if (!edit?.id) {
           setValue("startAt", "", { shouldValidate: false });
           setValue("manicuristId", "", { shouldValidate: false });
         }
@@ -428,6 +437,9 @@ export default function NewAppointmentButton({
     setValue("status", a.status, { shouldValidate: false });
     const d = new Date(a.startAt as string);
     setPickerDate(format(d, "yyyy-MM-dd"));
+    setTimeEntryMode("manual");
+    setManualHour(format(d, "HH"));
+    setManualMinute(format(d, "mm"));
     setManicuristFilter(lockedManicuristId ?? a.manicuristId);
     const iso = typeof a.startAt === "string" ? a.startAt : new Date(a.startAt).toISOString();
     setValue("startAt", iso, { shouldValidate: false });
@@ -476,23 +488,26 @@ export default function NewAppointmentButton({
         const svc = services.find((x) => x.id === s.serviceId);
         return sum + (s.durationMinutes ?? svc?.duration ?? 0);
       }, 0);
-      const endTime = new Date(new Date(finalStartAt).getTime() + totalMins * 60000);
 
-      const checkRes = await fetch(
-        `/api/appointments/availability?manicuristId=${data.manicuristId}&date=${dateStr}&serviceId=${selectedServices[0]?.serviceId ?? ""}&duration=${totalMins}`
-      );
-      const checkData = await checkRes.json();
-      const slots = (checkData?.data ?? []) as { start: string; end: string }[];
-      const isAvailable = slots.some(
-        (s) => new Date(s.start) <= new Date(finalStartAt) && new Date(s.end) >= endTime
-      );
-      if (!isAvailable) {
-        const nextSlot = slots[0];
-        const nextMsg = nextSlot
-          ? `. Próximo disponible: ${formatHour(new Date(nextSlot.start))}`
-          : ". No hay horarios disponibles este día.";
-        setError(`El turno dura ${totalMins} minutos y no hay disponibilidad en ese horario${nextMsg}`);
-        return;
+      if (!editingAppointment) {
+        const endTime = new Date(new Date(finalStartAt).getTime() + totalMins * 60000);
+
+        const checkRes = await fetch(
+          `/api/appointments/availability?manicuristId=${data.manicuristId}&date=${dateStr}&serviceId=${selectedServices[0]?.serviceId ?? ""}&duration=${totalMins}`
+        );
+        const checkData = await checkRes.json();
+        const slots = (checkData?.data ?? []) as { start: string; end: string }[];
+        const isAvailable = slots.some(
+          (s) => new Date(s.start) <= new Date(finalStartAt) && new Date(s.end) >= endTime
+        );
+        if (!isAvailable) {
+          const nextSlot = slots[0];
+          const nextMsg = nextSlot
+            ? `. Próximo disponible: ${formatHour(new Date(nextSlot.start))}`
+            : ". No hay horarios disponibles este día.";
+          setError(`El turno dura ${totalMins} minutos y no hay disponibilidad en ese horario${nextMsg}`);
+          return;
+        }
       }
     }
     if (!finalStartAt || !data.manicuristId || !data.clientId || selectedServices.length === 0) {
