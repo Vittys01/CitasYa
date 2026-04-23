@@ -487,7 +487,11 @@ export default function NewAppointmentButton({
         (s) => new Date(s.start) <= new Date(finalStartAt) && new Date(s.end) >= endTime
       );
       if (!isAvailable) {
-        setError("El horario seleccionado no está disponible. Elegí otro horario del listado.");
+        const nextSlot = slots[0];
+        const nextMsg = nextSlot
+          ? `. Próximo disponible: ${formatHour(new Date(nextSlot.start))}`
+          : ". No hay horarios disponibles este día.";
+        setError(`El turno dura ${totalMins} minutos y no hay disponibilidad en ese horario${nextMsg}`);
         return;
       }
     }
