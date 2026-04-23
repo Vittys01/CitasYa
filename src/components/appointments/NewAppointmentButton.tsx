@@ -84,7 +84,7 @@ const schema = z.object({
   manicuristId: z.string().min(1),
   startAt:      z.string().min(1),
   notes:        z.string().optional(),
-  status:       z.enum(["PENDING", "COMPLETED"]).optional(),
+  status:       z.enum(["PENDING", "CONFIRMED", "CANCELLED", "COMPLETED"]).optional(),
 }).refine((d) => d.clientId && d.manicuristId && d.startAt, { message: "Completá todos los campos" });
 
 type FormData = z.infer<typeof schema>;
