@@ -471,6 +471,25 @@ export default function NewAppointmentButton({
       }
       const dateStr = pickerDate;
       finalStartAt = canaryDate(dateStr, hour, minute).toISOString();
+
+      const totalMins = selectedServices.reduce((sum, s) => {
+        const svc = services.find((x) => x.id === s.serviceId);
+        return sum + (s.durationMinutes ?? svc?.duration ?? 0);
+      }, 0);
+      const endTime = new Date(new Date(finalStartAt).getTime() + totalMins * 60000);
+
+      const checkRes = await fetch(
+        `/api/appointments/availability?manicuristId=${data.manicuristId}&date=${dateStr}&serviceId=${selectedServices[0]?.serviceId ?? ""}&duration=${totalMins}`
+      );
+      const checkData = await checkRes.json();
+      const slots = (checkData?.data ?? []) as { start: string; end: string }[];
+      const isAvailable = slots.some(
+        (s) => new Date(s.start) <= new Date(finalStartAt) && new Date(s.end) >= endTime
+      );
+      if (!isAvailable) {
+        setError("El horario seleccionado no está disponible. Elegí otro horario del listado.");
+        return;
+      }
     }
     if (!finalStartAt || !data.manicuristId || !data.clientId || selectedServices.length === 0) {
       setError(g(settings, "validation.fillAll", "Completá cliente, al menos un servicio y horario."));
