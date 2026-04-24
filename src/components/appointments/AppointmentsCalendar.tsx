@@ -522,21 +522,17 @@ export default function AppointmentsCalendar({
                   </div>
                 )}
               </div>
-              {selectedAppointment.status === "PENDING" && onEditAppointment && (
+{selectedAppointment.status === "PENDING" && onEditAppointment && (
+                
                 <button
-                  type="button"
-                  onClick={() => {
-                    onEditAppointment(selectedAppointment);
-                    setSelectedAppointment(null);
-                  }}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-semibold border border-primary/30 rounded-lg text-primary-dark hover:bg-primary/10 transition"
+                  onClick={() => onEditAppointment(selectedAppointment)}
+                  className="flex items-center gap-2 px-3 py-2 bg-primary-dark hover:bg-primary-hover text-white rounded-lg text-sm font-medium transition"
                 >
                   <span className="material-symbols-outlined text-[18px]">edit</span>
-                  {(settings && settings["action.editAppointment"]) ?? "Editar turno"}
+                  Editar turno
                 </button>
               )}
-              {/* Complete appointment - only for PENDING */}
-              {selectedAppointment.status === "PENDING" && (
+              {(selectedAppointment.status === "PENDING" || selectedAppointment.status === "CONFIRMED") && onEditAppointment && (
                 <div className="pt-4 mt-4 border-t border-[#e6d5c3]">
                   {cancelError && <p className="text-red-500 text-xs mb-2">{cancelError}</p>}
                   <button
@@ -1317,7 +1313,7 @@ function DayColumn({
         const leftPct      = isSideBySide ? 4 + colIndex * (92 / totalCols) : 4;
         const widthPct     = isSideBySide ? 92 / totalCols - 0.5 : 92;
 
-        const canDrag = appt.status === "PENDING" && onApptDrop;
+        const canDrag = (appt.status === "PENDING" || appt.status === "CONFIRMED") && onApptDrop;
 
         return (
           <button
