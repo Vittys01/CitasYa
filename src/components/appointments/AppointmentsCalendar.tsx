@@ -522,8 +522,7 @@ export default function AppointmentsCalendar({
                   </div>
                 )}
               </div>
-{selectedAppointment.status === "PENDING" && onEditAppointment && (
-                
+              {(selectedAppointment.status === "PENDING" || selectedAppointment.status === "CONFIRMED") && onEditAppointment && (
                 <button
                   onClick={() => onEditAppointment(selectedAppointment)}
                   className="flex items-center gap-2 px-3 py-2 bg-primary-dark hover:bg-primary-hover text-white rounded-lg text-sm font-medium transition"
@@ -532,7 +531,7 @@ export default function AppointmentsCalendar({
                   Editar turno
                 </button>
               )}
-              {(selectedAppointment.status === "PENDING" || selectedAppointment.status === "CONFIRMED") && onEditAppointment && (
+              {(selectedAppointment.status === "PENDING" || selectedAppointment.status === "CONFIRMED") && (
                 <div className="pt-4 mt-4 border-t border-[#e6d5c3]">
                   {cancelError && <p className="text-red-500 text-xs mb-2">{cancelError}</p>}
                   <button
