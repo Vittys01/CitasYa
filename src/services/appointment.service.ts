@@ -221,8 +221,15 @@ export async function updateAppointment(
   input: UpdateAppointmentInput
 ): Promise<AppointmentWithRelations | null> {
   if (input.status === "COMPLETED") {
-    await cancelAppointment(id);
-    return null;
+    cancelScheduledReminder(id);
+
+    const completed = await prisma.appointment.update({
+      where: { id },
+      data: { status: "COMPLETED" },
+      include: appointmentInclude,
+    });
+
+    return completed as AppointmentWithRelations;
   }
 
   const existing = await prisma.appointment.findUniqueOrThrow({ where: { id } });
