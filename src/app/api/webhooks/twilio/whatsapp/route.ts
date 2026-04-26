@@ -1,16 +1,14 @@
 /**
  * Webhook Twilio: mensajes entrantes de WhatsApp
  *
- * Recibe mensajes de Twilio, los guarda en la base de datos para el chat,
- * y procesa el bot para generar respuestas automáticas.
+ * Recibe mensajes de Twilio y los guarda en la base de datos para el chat.
  *
- * Las confirmaciones/cancelaciones salientes no pasan por aquí: van por la API de Twilio
- * en `notification.service.ts` + `getWhatsAppProvider()`.
+ * BOT DESACTIVADO: Solo guarda mensajes. Las confirmaciones/cancelaciones
+ * salientes van por notification.service.ts + getWhatsAppProvider().
  */
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { saveIncomingMessage } from "@/services/whatsapp-chat.service";
-import { handleTwilioWhatsAppMessage } from "@/services/whatsapp-bot-twilio.service";
 
 export const runtime = "nodejs";
 
@@ -73,7 +71,6 @@ export async function POST(req: NextRequest) {
       if (fallbackBusiness) {
         console.log("[Twilio Webhook] Using fallback business:", fallbackBusiness.name);
 
-        // Save incoming message to database with fallback business
         await saveIncomingMessage(
           fallbackBusiness.id,
           phoneE164,
@@ -88,10 +85,6 @@ export async function POST(req: NextRequest) {
         );
 
         console.log("[Twilio Webhook] Message saved from:", phoneE164, "to fallback business:", fallbackBusiness.name);
-
-        // Process message with bot to generate response
-        console.log("[Twilio Webhook] Processing message with bot...");
-        await handleTwilioWhatsAppMessage(fallbackBusiness.id, phoneE164, body);
       } else {
         console.log("[Twilio Webhook] No active businesses found, message not saved");
       }
@@ -115,11 +108,6 @@ export async function POST(req: NextRequest) {
 
     console.log("[Twilio Webhook] Message saved from:", phoneE164, "to business:", business.name);
 
-    // Process message with bot to generate response
-    console.log("[Twilio Webhook] Processing message with bot...");
-    await handleTwilioWhatsAppMessage(business.id, phoneE164, body);
-
-    // Respond 200 OK to Twilio
     return new NextResponse(null, { status: 200 });
   } catch (error) {
     console.error("[Twilio Webhook] Error:", error);
