@@ -97,7 +97,7 @@ export function canaryDate(dateStr: string, hour: number, minute: number, second
 
   const offsetMin = (canaryH * 60 + canaryM) - (hour * 60 + minute);
 
-  return new Date(utcMs - offsetMin * 60000 + ms);
+  return new Date(utcMs - offsetMin * 60000);
 }
 
 /**
@@ -224,8 +224,9 @@ export function now(): Date {
 /** Format relative time (e.g. "hace 5 min", "ayer") */
 export function formatRelativeTime(date: Date | string): string {
   const dateObj = typeof date === "string" ? new Date(date) : date;
-  const currentTime = now();
-  const diffMs = currentTime.getTime() - dateObj.getTime();
+  const canaryObj = toCanaryTimezone(dateObj);
+  const currentCanary = now();
+  const diffMs = currentCanary.getTime() - canaryObj.getTime();
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);
@@ -239,5 +240,6 @@ export function formatRelativeTime(date: Date | string): string {
   return dateObj.toLocaleDateString("es-ES", {
     day: "2-digit",
     month: "2-digit",
+    timeZone: "Atlantic/Canary"
   });
 }

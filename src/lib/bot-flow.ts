@@ -328,7 +328,7 @@ export function generateDateOptions(
     date.setDate(date.getDate() + i);
 
     // Formato: "Lunes 15"
-    const dayName = date.toLocaleDateString("es-AR", { weekday: "long" });
+    const dayName = date.toLocaleDateString("es-AR", { weekday: "long", timeZone: "Atlantic/Canary" });
     const dayNum = date.getDate();
     const label = `${dayName.charAt(0).toUpperCase() + dayName.slice(1)} ${dayNum}`;
 

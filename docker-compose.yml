@@ -1,5 +1,6 @@
 # ─── Shared environment ───────────────────────────────────────────────────────
 x-app-env: &app-env
+  TZ:                          "Atlantic/Canary"
   DATABASE_URL:            ${DATABASE_URL:-postgresql://dates_user:dates_pass@postgres:5432/dates_db}
   AUTH_SECRET:             ${AUTH_SECRET:-change-me-in-production-min-32-chars}
   NEXT_PUBLIC_APP_URL:     ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}

@@ -507,7 +507,7 @@ export default function NewAppointmentButton({
       let startH: number, startM: number;
       
       if (timeEntryMode === "slots" && data.startAt) {
-        const startDt = new Date(data.startAt);
+        const startDt = toCanaryTimezone(new Date(data.startAt));
         startH = startDt.getHours();
         startM = startDt.getMinutes();
       } else {
@@ -1190,7 +1190,7 @@ export default function NewAppointmentButton({
                       type="date"
                       value={pickerDate}
                       onChange={(e) => setPickerDate(e.target.value)}
-                      min={now().toISOString().slice(0, 10)}
+                      min={format(now(), "yyyy-MM-dd")}
                       className={inputCls}
                     />
                     <p className="text-[10px] text-earth-muted mt-1">
@@ -1348,7 +1348,7 @@ export default function NewAppointmentButton({
                       {endHour && endMinute && timeEntryMode === "slots" && watch("startAt") && (
                         <div className="text-xs text-earth-muted self-end pb-2">
                           ({(() => {
-                            const startDt = new Date(watch("startAt"));
+                            const startDt = toCanaryTimezone(new Date(watch("startAt")));
                             const startH = parseInt(format(startDt, "HH"), 10);
                             const startM = parseInt(format(startDt, "mm"), 10);
                             const endH = parseInt(endHour, 10);

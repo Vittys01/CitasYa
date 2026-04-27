@@ -1,7 +1,9 @@
 # BullMQ Worker — separate process, same codebase
 FROM node:20-alpine
-RUN apk add --no-cache openssl
+RUN apk add --no-cache openssl tzdata
 WORKDIR /app
+
+ENV TZ=Atlantic/Canary
 
 COPY package.json package-lock.json* ./
 RUN npm ci

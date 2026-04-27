@@ -874,13 +874,15 @@ async function showAvailableSlots(
     
     // Ordenar slots por cercanía a la hora solicitada
     const sortedByDiff = [...slots].sort((a, b) => {
-      const diffA = Math.abs(a.start.getHours() - targetHour) + Math.abs(a.start.getMinutes() - targetMinute) / 60;
-      const diffB = Math.abs(b.start.getHours() - targetHour) + Math.abs(b.start.getMinutes() - targetMinute) / 60;
+      const aCanary = toCanaryTimezone(a.start);
+      const bCanary = toCanaryTimezone(b.start);
+      const diffA = Math.abs(aCanary.getHours() - targetHour) + Math.abs(aCanary.getMinutes() - targetMinute) / 60;
+      const diffB = Math.abs(bCanary.getHours() - targetHour) + Math.abs(bCanary.getMinutes() - targetMinute) / 60;
       return diffA - diffB;
     });
     
     const closestSlot = sortedByDiff[0];
-    const hourDiff = Math.abs(closestSlot.start.getHours() - targetHour);
+    const hourDiff = Math.abs(toCanaryTimezone(closestSlot.start).getHours() - targetHour);
     
     if (hourDiff <= 1) {
       // Dentro de 1 hora, usar ese slot directamente

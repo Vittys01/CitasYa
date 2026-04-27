@@ -42,7 +42,7 @@ export async function isSlotAvailable(
   excludeAppointmentId?: string
 ): Promise<boolean> {
   // 1. Check the manicurist has a schedule for that day
-  const dayOfWeek = startAt.getDay();
+  const dayOfWeek = toCanaryTimezone(startAt).getDay();
   const schedule = await prisma.schedule.findUnique({
     where: { manicuristId_dayOfWeek: { manicuristId, dayOfWeek } },
   });
@@ -419,12 +419,13 @@ export async function getAppointmentsByWeek(
   weekStart: Date,
   options?: { manicuristId?: string; businessId?: string }
 ): Promise<AppointmentWithRelations[]> {
-  const end = new Date(weekStart);
+  const canaryWeekStart = toCanaryTimezone(weekStart);
+  const end = new Date(canaryWeekStart);
   end.setDate(end.getDate() + 7);
 
   const rows = await prisma.appointment.findMany({
     where: {
-      startAt: { gte: weekStart, lt: end },
+      startAt: { gte: canaryWeekStart, lt: end },
       ...(options?.businessId ? { businessId: options.businessId } : {}),
       ...(options?.manicuristId ? { manicuristId: options.manicuristId } : {}),
     },
@@ -440,8 +441,9 @@ export async function getAppointmentsByMonth(
   month: Date,
   options?: { manicuristId?: string; businessId?: string }
 ): Promise<AppointmentWithRelations[]> {
-  const start = startOfMonth(month);
-  const end = endOfMonth(month);
+  const canaryMonth = toCanaryTimezone(month);
+  const start = startOfMonth(canaryMonth);
+  const end = endOfMonth(canaryMonth);
 
   const rows = await prisma.appointment.findMany({
     where: {
@@ -462,7 +464,7 @@ export async function getAvailableSlots(
   serviceDuration: number,
   earliestStart?: Date
 ): Promise<{ start: Date; end: Date }[]> {
-  const dayOfWeek = date.getDay();
+  const dayOfWeek = toCanaryTimezone(date).getDay();
   const schedule = await prisma.schedule.findUnique({
     where: { manicuristId_dayOfWeek: { manicuristId, dayOfWeek } },
   });

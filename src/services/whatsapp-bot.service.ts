@@ -474,8 +474,9 @@ async function handleSmartBookingFlow(
       let minDiff = 24;
       
       for (const slot of slots) {
-        const slotHour = slot.start.getHours();
-        const slotMinute = slot.start.getMinutes();
+        const slotCanary = toCanaryTimezone(slot.start);
+        const slotHour = slotCanary.getHours();
+        const slotMinute = slotCanary.getMinutes();
         const diff = Math.abs(slotHour - targetHour) + Math.abs(slotMinute - targetMinute) / 60;
         
         if (diff < minDiff) {

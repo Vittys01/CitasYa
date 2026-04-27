@@ -195,7 +195,7 @@ export default function AppointmentsCalendar({
 
   const mergeAppointmentIntoState = useCallback(
     (appt: AppointmentForClient) => {
-      const apptWeek = format(startOfWeek(new Date(appt.startAt), { weekStartsOn: 1 }), "yyyy-MM-dd");
+      const apptWeek = format(startOfWeek(toCanaryTimezone(new Date(appt.startAt)), { weekStartsOn: 1 }), "yyyy-MM-dd");
       const mergeList = (list: AppointmentForClient[]) => {
         const exists = list.some((x) => x.id === appt.id);
         if (exists) return list.map((x) => (x.id === appt.id ? appt : x));
@@ -210,7 +210,7 @@ export default function AppointmentsCalendar({
         const list = prev[apptWeek];
         return { ...prev, [apptWeek]: mergeList(list ?? []) };
       });
-      const apptMonth = format(new Date(appt.startAt), "yyyy-MM");
+      const apptMonth = format(toCanaryTimezone(new Date(appt.startAt)), "yyyy-MM");
       setFetchedByMonth((prev) => {
         const list = prev[apptMonth];
         return { ...prev, [apptMonth]: mergeList(list ?? []) };
@@ -236,7 +236,7 @@ export default function AppointmentsCalendar({
 
     let cancelled = false;
     setLoadingWeek(viewWeekKey);
-    const params = new URLSearchParams({ weekStart: viewWeekStart.toISOString() });
+    const params = new URLSearchParams({ weekStart: format(viewWeekStart, "yyyy-MM-dd") });
     if (lockedManicuristId) params.set("manicuristId", lockedManicuristId);
     fetch(`/api/appointments?${params}`)
       .then((res) => res.json())
@@ -260,7 +260,7 @@ export default function AppointmentsCalendar({
 
     let cancelled = false;
     setLoadingMonth(viewMonthKey);
-    const params = new URLSearchParams({ month: startOfMonth(monthCursor).toISOString() });
+    const params = new URLSearchParams({ month: format(startOfMonth(monthCursor), "yyyy-MM-dd") });
     if (lockedManicuristId) params.set("manicuristId", lockedManicuristId);
     fetch(`/api/appointments?${params}`)
       .then((res) => res.json())
@@ -280,7 +280,7 @@ export default function AppointmentsCalendar({
   const displayAppointments = view === "month"
     ? (fetchedByMonth[viewMonthKey] !== undefined
         ? fetchedByMonth[viewMonthKey]!
-        : appointments.filter((a) => isSameMonth(new Date(a.startAt), monthCursor)))
+        : appointments.filter((a) => isSameMonth(toCanaryTimezone(new Date(a.startAt)), monthCursor)))
     : viewWeekKey === initialWeekStartKey
       ? appointments
       : (fetchedByWeek[viewWeekKey] ?? []);
@@ -310,7 +310,7 @@ export default function AppointmentsCalendar({
           throw new Error(j.error?.message ?? "Error al mover");
         }
         const start = new Date(appt.startAt);
-        const sourceKey = format(startOfWeek(start, { weekStartsOn: 1 }), "yyyy-MM-dd");
+        const sourceKey = format(startOfWeek(toCanaryTimezone(start), { weekStartsOn: 1 }), "yyyy-MM-dd");
         const targetKey = format(startOfWeek(newStart, { weekStartsOn: 1 }), "yyyy-MM-dd");
         setAppointments((prev) => {
           if (sourceKey === initialWeekStartKey && targetKey === initialWeekStartKey) {
@@ -348,7 +348,7 @@ export default function AppointmentsCalendar({
   );
 
   const days = useMemo(
-    () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)).map(d => toCanaryTimezone(d)),
+    () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
     [weekStart]
   );
 
@@ -391,7 +391,7 @@ export default function AppointmentsCalendar({
     return eachDayOfInterval({ start: gridStart, end: gridEnd });
   }, [monthCursor]);
 
-  const viewDays = view === "week" ? days : [toCanaryTimezone(selectedDay)];
+  const viewDays = view === "week" ? days : [selectedDay];
 
   /** En vista día: manicuristas a mostrar como columnas (según filtro) */
   const dayViewManicurists = useMemo(
@@ -404,9 +404,8 @@ export default function AppointmentsCalendar({
   }
 
   function getApptForDayAndManicurist(day: Date, manicuristId: string) {
-    const canaryDay = toCanaryTimezone(day);
     return filtered.filter((a) =>
-      isSameDay(toCanaryTimezone(new Date(a.startAt)), canaryDay) &&
+      isSameDay(toCanaryTimezone(new Date(a.startAt)), day) &&
       a.manicuristId === manicuristId
     );
   }
@@ -708,13 +707,13 @@ export default function AppointmentsCalendar({
             {view === "month" && loadingMonth === viewMonthKey ? (
               <span className="font-normal text-earth-muted">Cargando…</span>
             ) : view === "month" ? (
-              format(toCanaryTimezone(monthCursor), "MMMM yyyy", { locale: es })
+              format(monthCursor, "MMMM yyyy", { locale: es })
             ) : loadingWeek === viewWeekKey ? (
               <span className="font-normal text-earth-muted">Cargando…</span>
             ) : view === "week" ? (
-              `${format(toCanaryTimezone(weekStart), "d MMM", { locale: es })} – ${format(toCanaryTimezone(addDays(weekStart, 6)), "d MMM yyyy", { locale: es })}`
+              `${format(weekStart, "d MMM", { locale: es })} – ${format(addDays(weekStart, 6), "d MMM yyyy", { locale: es })}`
             ) : (
-              format(toCanaryTimezone(selectedDay), "EEEE d MMM yyyy", { locale: es })
+              format(selectedDay, "EEEE d MMM yyyy", { locale: es })
             )}
           </h2>
         </div>
@@ -975,7 +974,7 @@ export default function AppointmentsCalendar({
                     )}
                   >
                     <p className="text-[10px] font-semibold uppercase text-earth-muted">
-                      {format(toCanaryTimezone(day), "EEE", { locale: es })}
+                      {format(day, "EEE", { locale: es })}
                     </p>
                     <div
                       className={cn(
@@ -1160,7 +1159,7 @@ function slotFromOffsetY(offsetY: number, slotDay: Date): Date {
   );
   const h = Math.floor(rounded / 60);
   const m = rounded % 60;
-  const start = toCanaryTimezone(new Date(slotDay));
+  const start = new Date(slotDay);
   start.setHours(h, m, 0, 0);
   return start;
 }
@@ -1400,7 +1399,7 @@ function CurrentTimeLine({ gridStartHour, pxPerHour }: { gridStartHour: number; 
     >
       <div className="w-16 text-right pr-2">
         <span className="text-[10px] font-bold text-primary-dark bg-[#FFFDF5] px-1">
-          {formatHour(now())}
+          {formatHour(toCanaryTimezone(new Date()))}
         </span>
       </div>
       <div className="flex-1 h-px bg-primary-dark relative">

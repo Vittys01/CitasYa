@@ -437,19 +437,19 @@ function extractDates(text: string): Date[] {
         break;
 
       case "afternoon": {
-        const ds = currentTime.toISOString().slice(0, 10);
+        const ds = format(currentTime, "yyyy-MM-dd");
         date = canaryDate(ds, 14, 0);
         break;
       }
 
       case "evening": {
-        const ds = currentTime.toISOString().slice(0, 10);
+        const ds = format(currentTime, "yyyy-MM-dd");
         date = canaryDate(ds, 20, 0);
         break;
       }
 
       case "early_morning": {
-        const ds = currentTime.toISOString().slice(0, 10);
+        const ds = format(currentTime, "yyyy-MM-dd");
         date = canaryDate(ds, 8, 0);
         break;
       }

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
-import { now } from "@/lib/utils";
+import { now, canaryDayBounds } from "@/lib/utils";
+import { format } from "date-fns";
 import type { DashboardStats, ManicuristProductivity } from "@/types";
 
 export async function getDashboardStats(
@@ -7,10 +8,8 @@ export async function getDashboardStats(
   to: Date,
   options?: { businessId?: string; manicuristId?: string }
 ): Promise<DashboardStats> {
-  const today = now();
-  today.setHours(0, 0, 0, 0);
-  const todayEnd = new Date(today);
-  todayEnd.setHours(23, 59, 59, 999);
+  const todayStr = format(now(), "yyyy-MM-dd");
+  const { start: today, end: todayEnd } = canaryDayBounds(todayStr);
 
   const baseFilter = {
     ...(options?.businessId ? { businessId: options.businessId } : {}),
