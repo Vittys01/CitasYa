@@ -95,7 +95,9 @@ export function canaryDate(dateStr: string, hour: number, minute: number, second
   const canaryH = h === 24 ? 0 : h;
   const canaryM = parseInt(parts.find(p => p.type === "minute")!.value, 10);
 
-  const offsetMin = (canaryH * 60 + canaryM) - (hour * 60 + minute);
+  let offsetMin = (canaryH * 60 + canaryM) - (hour * 60 + minute);
+  if (offsetMin > 720) offsetMin -= 1440;
+  if (offsetMin < -720) offsetMin += 1440;
 
   return new Date(utcMs - offsetMin * 60000);
 }
