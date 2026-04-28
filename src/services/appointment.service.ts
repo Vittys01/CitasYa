@@ -7,7 +7,7 @@
  *   - Programar WhatsApp (confirmación / recordatorio) sin Redis
  */
 
-import { addDays, endOfMonth, format, isSameDay, startOfMonth } from "date-fns";
+import { addDays, format, isSameDay } from "date-fns";
 import { es } from "date-fns/locale";
 import { prisma } from "@/lib/db";
 import {
@@ -19,6 +19,7 @@ import {
   toCanaryTimezone,
   canaryDate,
   canaryDayBounds,
+  getCanaryDateString,
 } from "@/lib/utils";
 import {
   enqueueConfirmation,
@@ -419,13 +420,15 @@ export async function getAppointmentsByWeek(
   weekStart: Date,
   options?: { manicuristId?: string; businessId?: string }
 ): Promise<AppointmentWithRelations[]> {
-  const canaryWeekStart = toCanaryTimezone(weekStart);
-  const end = new Date(canaryWeekStart);
-  end.setDate(end.getDate() + 7);
+  const wsStr = getCanaryDateString(weekStart);
+  const start = canaryDate(wsStr, 0, 0);
+  const nextWeekTs = weekStart.getTime() + 7 * 24 * 60 * 60 * 1000;
+  const nwsStr = getCanaryDateString(new Date(nextWeekTs));
+  const end = canaryDate(nwsStr, 0, 0);
 
   const rows = await prisma.appointment.findMany({
     where: {
-      startAt: { gte: canaryWeekStart, lt: end },
+      startAt: { gte: start, lt: end },
       ...(options?.businessId ? { businessId: options.businessId } : {}),
       ...(options?.manicuristId ? { manicuristId: options.manicuristId } : {}),
     },
@@ -441,13 +444,17 @@ export async function getAppointmentsByMonth(
   month: Date,
   options?: { manicuristId?: string; businessId?: string }
 ): Promise<AppointmentWithRelations[]> {
-  const canaryMonth = toCanaryTimezone(month);
-  const start = startOfMonth(canaryMonth);
-  const end = endOfMonth(canaryMonth);
+  const mStr = getCanaryDateString(month);
+  const [y, m] = mStr.split("-").map(Number);
+  const start = canaryDate(mStr, 0, 0);
+  const nextM = m === 12 ? 1 : m + 1;
+  const nextY = m === 12 ? y + 1 : y;
+  const nextMStr = `${nextY}-${String(nextM).padStart(2, "0")}-01`;
+  const end = canaryDate(nextMStr, 0, 0);
 
   const rows = await prisma.appointment.findMany({
     where: {
-      startAt: { gte: start, lte: end },
+      startAt: { gte: start, lt: end },
       ...(options?.businessId ? { businessId: options.businessId } : {}),
       ...(options?.manicuristId ? { manicuristId: options.manicuristId } : {}),
     },

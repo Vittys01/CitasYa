@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { resolveBusinessIdFromSession } from "@/lib/resolve-business-session";
-import { apiError, apiSuccess, now } from "@/lib/utils";
+import { apiError, apiSuccess, now, toCanaryTimezone } from "@/lib/utils";
 import {
   createAppointment,
   getAppointmentsByDate,
@@ -69,15 +69,15 @@ export async function GET(req: NextRequest) {
 
   try {
     if (month) {
-      const data = await getAppointmentsByMonth(new Date(month), options);
+      const data = await getAppointmentsByMonth(toCanaryTimezone(new Date(month)), options);
       return NextResponse.json(apiSuccess(data));
     }
     if (weekStart) {
-      const data = await getAppointmentsByWeek(new Date(weekStart), options);
+      const data = await getAppointmentsByWeek(toCanaryTimezone(new Date(weekStart)), options);
       return NextResponse.json(apiSuccess(data));
     }
 
-    const target = date ? new Date(date) : now();
+    const target = date ? toCanaryTimezone(new Date(date)) : now();
     const data = await getAppointmentsByDate(target, options);
     return NextResponse.json(apiSuccess(data));
   } catch (err) {

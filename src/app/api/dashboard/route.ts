@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { apiError, apiSuccess, now } from "@/lib/utils";
+import { apiError, apiSuccess, now, canaryDate, getCanaryDateString } from "@/lib/utils";
 import { getDashboardStats, getManicuristProductivity } from "@/services/dashboard.service";
 
 export async function GET(req: NextRequest) {
@@ -16,13 +16,18 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = req.nextUrl;
 
-  const currentTime = now();
-  const defaultFrom = new Date(currentTime.getFullYear(), currentTime.getMonth(), 1);
+  const canaryNow = now();
+  const nowStr = getCanaryDateString(canaryNow);
+  const [y, m] = nowStr.split("-").map(Number);
+  const defaultFrom = canaryDate(`${y}-${String(m).padStart(2, "0")}-01`, 0, 0);
 
-  const from = new Date(searchParams.get("from") ?? defaultFrom.toISOString());
-  const to = new Date(searchParams.get("to") ?? currentTime.toISOString());
+  const from = searchParams.get("from")
+    ? canaryDate(searchParams.get("from")!.slice(0, 10), 0, 0)
+    : defaultFrom;
+  const to = searchParams.get("to")
+    ? canaryDate(searchParams.get("to")!.slice(0, 10), 23, 59, 59)
+    : canaryDate(nowStr, 23, 59, 59);
 
-  // Restricciones para manicuristas: solo ver sus propias estadísticas
   const isManicurist = session.user.role === "MANICURIST";
   const manicuristId = isManicurist ? (session.user.manicuristId ?? undefined) : undefined;
 

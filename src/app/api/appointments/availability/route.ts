@@ -5,9 +5,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { isSameDay } from "date-fns";
 import { auth } from "@/lib/auth";
-import { apiError, apiSuccess, ceilToNextSlotMinute, now } from "@/lib/utils";
+import { apiError, apiSuccess, ceilToNextSlotMinute, now, canaryDate, getCanaryDateString } from "@/lib/utils";
 import { getAvailableSlots } from "@/services/appointment.service";
 import { prisma } from "@/lib/db";
 
@@ -20,13 +19,11 @@ export async function GET(req: NextRequest) {
   const date = searchParams.get("date");
   const serviceId = searchParams.get("serviceId");
 
-  // Restricciones para manicuristas: solo ver su propia disponibilidad
   if (session.user.role === "MANICURIST") {
     const userManicuristId = session.user.manicuristId;
     if (!userManicuristId) {
       return NextResponse.json(apiError("No manicurist asociado", "AUTH"), { status: 403 });
     }
-    // Si intentan ver disponibilidad de otra manicurista, forzar a ver solo la propia
     if (manicuristId && manicuristId !== userManicuristId) {
       return NextResponse.json(
         apiError("Las manicuristas solo pueden ver su propia disponibilidad", "PERMISSION"),
@@ -51,16 +48,12 @@ export async function GET(req: NextRequest) {
     ? Math.max(1, parseInt(durationParam, 10) || service.duration)
     : service.duration;
 
-  const dateLocal =
-    /^\d{4}-\d{2}-\d{2}$/.test(date)
-      ? (() => {
-          const [y, m, d] = date.split("-").map(Number);
-          return new Date(y, m - 1, d);
-        })()
-      : new Date(date);
+  const dateStr = /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : getCanaryDateString(new Date(date));
+  const dateLocal = canaryDate(dateStr, 12, 0);
 
-  const currentTime = now();
-  const earliestStart = isSameDay(dateLocal, currentTime) ? ceilToNextSlotMinute(currentTime) : undefined;
+  const canaryNow = now();
+  const todayCanaryStr = getCanaryDateString(canaryNow);
+  const earliestStart = dateStr === todayCanaryStr ? ceilToNextSlotMinute(canaryNow) : undefined;
   const slots = await getAvailableSlots(manicuristId, dateLocal, duration, earliestStart);
 
   return NextResponse.json(

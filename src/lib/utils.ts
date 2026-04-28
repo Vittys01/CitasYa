@@ -72,6 +72,14 @@ export function toCanaryTimezone(date: Date): Date {
 }
 
 /**
+ * Devuelve la fecha en formato "yyyy-MM-dd" según la zona horaria de Canarias.
+ * Funciona correctamente independientemente de la timezone del sistema.
+ */
+export function getCanaryDateString(date: Date): string {
+  return date.toLocaleDateString("sv-SE", { timeZone: "Atlantic/Canary" });
+}
+
+/**
  * Crea un Date cuyo timestamp UTC representa la hora indicada en zona horaria de Canarias.
  * Funciona correctamente en frontend (navegador) y backend (Node.js),
  * independientemente de la timezone del sistema.

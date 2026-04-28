@@ -23,11 +23,11 @@ export default async function DashboardPage() {
 
   const [settings, stats, productivity, todayAppts] = await Promise.all([
     getAppSettings(businessId),
-    getDashboardStats(monthStart, new Date(), { businessId, manicuristId: isManicurist ? manicuristId : undefined }),
+    getDashboardStats(monthStart, canaryNow, { businessId, manicuristId: isManicurist ? manicuristId : undefined }),
     isManicurist
       ? Promise.resolve([])
-      : getManicuristProductivity(monthStart, new Date(), businessId),
-    getAppointmentsByDate(new Date(), { businessId, manicuristId: isManicurist ? manicuristId : undefined }),
+      : getManicuristProductivity(monthStart, canaryNow, businessId),
+    getAppointmentsByDate(canaryNow, { businessId, manicuristId: isManicurist ? manicuristId : undefined }),
   ]);
 
   const todayApptsForClient = todayAppts.map(serializeAppointmentPrice);

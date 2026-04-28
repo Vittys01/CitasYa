@@ -396,7 +396,7 @@ export function hasSessionExpired(
 ): boolean {
   if (!session.updatedAt) return false;
 
-  const currentTime = new Date();
+  const currentTime = now();
   const sessionTime = new Date(session.updatedAt);
   const elapsedMinutes = (currentTime.getTime() - sessionTime.getTime()) / (1000 * 60);
 
@@ -412,7 +412,7 @@ export function getSessionRemainingTime(
 ): number | null {
   if (!session.updatedAt) return null;
 
-  const currentTime = new Date();
+  const currentTime = now();
   const sessionTime = new Date(session.updatedAt);
   const elapsedMinutes = (currentTime.getTime() - sessionTime.getTime()) / (1000 * 60);
   const remaining = timeoutMinutes - elapsedMinutes;
