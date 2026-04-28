@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   BarChart,
   Bar,
@@ -15,15 +16,63 @@ import type { ManicuristProductivity } from "@/types";
 
 const g = (s: Record<string, string> | undefined, k: string, fb: string) => (s && s[k]) ?? fb;
 
+type TabType = "revenue" | "appointments" | "avg";
+
 interface ProductivityChartProps {
   data: ManicuristProductivity[];
   settings?: Record<string, string>;
 }
 
+const tabs = [
+  { id: "revenue" as const, labelKey: "chart.tab.revenue", fallback: "Ingresos" },
+  { id: "appointments" as const, labelKey: "chart.tab.appointments", fallback: "Turnos" },
+  { id: "avg" as const, labelKey: "chart.tab.avg", fallback: "Promedio" },
+];
+
 export default function ProductivityChart({ data, settings }: ProductivityChartProps) {
+  const [activeTab, setActiveTab] = useState<TabType>("revenue");
+
+  const getChartData = (tab: TabType) => {
+    return data.map((m) => ({
+      name: m.name,
+      value:
+        tab === "revenue"
+          ? m.totalRevenue
+          : tab === "appointments"
+          ? m.completedAppointments
+          : m.avgPerAppointment,
+      totalAppointments: m.totalAppointments,
+      completedAppointments: m.completedAppointments,
+      totalRevenue: m.totalRevenue,
+    }));
+  };
+
+  const chartData = getChartData(activeTab);
+
+  const formatValue = (value: number) => {
+    if (activeTab === "revenue") return formatPrice(value, settings);
+    if (activeTab === "appointments") return value.toString();
+    return formatPrice(value, settings);
+  };
+
+  const formatTooltip = (value: number) => [
+    formatValue(value),
+    activeTab === "revenue"
+      ? g(settings, "chart.tooltip.revenue", "Ingresos")
+      : activeTab === "appointments"
+      ? g(settings, "chart.tab.appointments", "Turnos")
+      : g(settings, "chart.tooltip.avg", "Promedio"),
+  ];
+
+  const getYAxisFormat = (v: number) => {
+    if (activeTab === "revenue") return `$${(v / 1000).toFixed(0)}k`;
+    if (activeTab === "appointments") return v.toString();
+    return `$${(v / 1000).toFixed(0)}k`;
+  };
+
   return (
     <div className="bg-[#FFFDF5] rounded-xl border border-[#e6d5c3] p-5 lg:p-6 shadow-warm-sm h-full min-w-0">
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex items-center justify-between mb-4">
         <div className="min-w-0">
           <h2 className="text-base font-bold text-earth truncate">
             {g(settings, "chart.productivity.title", "Productividad")}
@@ -37,6 +86,22 @@ export default function ProductivityChart({ data, settings }: ProductivityChartP
         </div>
       </div>
 
+      <div className="flex gap-1 mb-4 bg-[#f5ebe0] p-1 rounded-lg">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex-1 py-1.5 px-2 text-xs font-medium rounded-md transition-all duration-200 ${
+              activeTab === tab.id
+                ? "bg-white text-earth shadow-sm"
+                : "text-earth-muted hover:text-earth"
+            }`}
+          >
+            {g(settings, tab.labelKey, tab.fallback)}
+          </button>
+        ))}
+      </div>
+
       {data.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 text-[#bda696]">
           <span className="material-symbols-outlined text-4xl mb-2">analytics</span>
@@ -46,7 +111,7 @@ export default function ProductivityChart({ data, settings }: ProductivityChartP
         <>
           <div className="w-full min-w-0">
             <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={data} margin={{ top: 4, right: 4, left: -8, bottom: 0 }}>
+              <BarChart data={chartData} margin={{ top: 4, right: 4, left: -8, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0ede8" vertical={false} />
                 <XAxis
                   dataKey="name"
@@ -57,17 +122,14 @@ export default function ProductivityChart({ data, settings }: ProductivityChartP
                   interval={0}
                 />
                 <YAxis
-                  tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`}
+                  tickFormatter={(v: number) => getYAxisFormat(v)}
                   tick={{ fontSize: 10, fill: "#bda696" }}
                   axisLine={false}
                   tickLine={false}
                   width={40}
                 />
                 <Tooltip
-                  formatter={(value: number) => [
-                    formatPrice(value, settings),
-                    g(settings, "chart.tooltip.revenue", "Ingresos"),
-                  ]}
+                  formatter={(value: number) => formatTooltip(value)}
                   contentStyle={{
                     borderRadius: "10px",
                     border: "1px solid #e6d5c3",
@@ -78,7 +140,7 @@ export default function ProductivityChart({ data, settings }: ProductivityChartP
                   }}
                   cursor={{ fill: "#f5ebe0" }}
                 />
-                <Bar dataKey="totalRevenue" radius={[6, 6, 0, 0]} maxBarSize={40}>
+                <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={40}>
                   {data.map((entry) => (
                     <Cell key={entry.manicuristId} fill={entry.color} />
                   ))}

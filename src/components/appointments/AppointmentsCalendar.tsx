@@ -1360,7 +1360,7 @@ function DayColumn({
             )}
             <div className="flex items-center justify-between mt-0.5 gap-1 flex-shrink-0">
               <span className="text-[10px] opacity-60 whitespace-nowrap tabular-nums">
-                {formatHour(start)} – {formatHour(end)}
+                {formatHour(toCanaryTimezone(start))} – {formatHour(toCanaryTimezone(end))}
               </span>
               {showManiChip && !short && (
                 <span
