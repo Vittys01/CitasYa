@@ -8,7 +8,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { saveIncomingMessage } from "@/services/whatsapp-chat.service";
 import { handleTwilioWhatsAppMessage } from "@/services/whatsapp-bot-twilio.service";
+import { handleGeminiWhatsAppMessage } from "@/services/gemini-bot.service";
 import { now } from "@/lib/utils";
+
+const BOT_PROVIDER = process.env.WHATSAPP_BOT_PROVIDER || "legacy";
 import crypto from "crypto";
 
 // ─── Tipos ─────────────────────────────────────────────────────────────────────
@@ -148,11 +151,11 @@ export async function POST(req: NextRequest) {
 
     // Trigger WhatsApp bot para procesar el mensaje
     try {
-      await handleTwilioWhatsAppMessage(
-        business.id,
-        normalisedFrom,
-        body
-      );
+      if (BOT_PROVIDER === "gemini") {
+        await handleGeminiWhatsAppMessage(business.id, normalisedFrom, body);
+      } else {
+        await handleTwilioWhatsAppMessage(business.id, normalisedFrom, body);
+      }
     } catch (botError) {
       console.error("[Twilio Webhook] Error processing bot message:", botError);
       // No fallar la respuesta del webhook si el bot falla

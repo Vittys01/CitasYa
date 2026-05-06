@@ -546,7 +546,7 @@ async function handleSmartBookingFlow(
 
     // Ninguna disponibilidad, mostrar otros días
     return {
-      message: `${buildServiceConfirmedMessage(currentData.serviceName!, currentData.serviceDuration!)}\n\n😔 No hay disponibilidad para el ${format(selectedDate, "d/M")}. ¿Querés ver otros días?`,
+      message: `${buildServiceConfirmedMessage(currentData.serviceName!, currentData.serviceDuration!)}\n\n😔 No hay disponibilidad para el ${format(toCanaryTimezone(selectedDate), "d/M")}. ¿Querés ver otros días?`,
       nextStep: "date",
     };
   }
