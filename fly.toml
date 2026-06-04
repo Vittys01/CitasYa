@@ -1,5 +1,6 @@
 app = "citasya"
 primary_region = "mad"
+release_command = "./node_modules/.bin/prisma migrate deploy"
 
 [build]
   dockerfile = "Dockerfile"
@@ -7,15 +8,3 @@ primary_region = "mad"
 [http_service]
   internal_port = 3000
   force_https = true
-
-[deploy]
-  release_command = "./node_modules/.bin/prisma migrate deploy"
-
-[[services]]
-  ports = ["443"]
-  protocol = "tcp"
-
-  [services.concurrency]
-    type = "connections"
-    hard_limit = 25
-    soft_limit = 20
