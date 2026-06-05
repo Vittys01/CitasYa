@@ -1,5 +1,5 @@
 app = "citasya"
-primary_region = "mad"
+primary_region = "cdg"
 release_command = "./node_modules/.bin/prisma migrate deploy"
 
 [build]

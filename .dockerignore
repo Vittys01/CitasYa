@@ -1,0 +1,12 @@
+node_modules/
+.next/
+.env
+.env.local
+.env.*.local
+.git/
+.DS_Store
+*.md
+docs/
+# scripts/ (needed for build)
+*.sql
+pnpm-lock.yaml

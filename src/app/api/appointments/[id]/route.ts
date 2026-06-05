@@ -21,7 +21,7 @@ const appointmentServiceSchema = z.object({
 });
 
 const updateSchema = z.object({
-  status: z.enum(["PENDING", "COMPLETED"]).optional(),
+  status: z.enum(["PENDING", "CONFIRMED", "COMPLETED", "CANCELLED"]).optional(),
   notes: z.string().optional(),
   startAt: z.string().datetime().optional(),
   manicuristId: z.string().cuid().optional(),
