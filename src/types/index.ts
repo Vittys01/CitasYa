@@ -10,6 +10,9 @@ import type {
   AppointmentStatus,
   NotificationType,
   NotificationStatus,
+  Invoice,
+  InvoiceItem,
+  InvoiceStatus,
 } from "@prisma/client";
 
 // ─── Re-exports ───────────────────────────────────────────────────────────────
@@ -25,6 +28,9 @@ export type {
   AppointmentStatus,
   NotificationType,
   NotificationStatus,
+  Invoice,
+  InvoiceItem,
+  InvoiceStatus,
 };
 
 // ─── Composed types ───────────────────────────────────────────────────────────
@@ -105,6 +111,7 @@ export interface CreateClientInput {
   phone: string;
   email?: string;
   notes?: string;
+  nif?: string;
 }
 
 export interface UpdateClientInput extends Partial<CreateClientInput> {}
@@ -170,4 +177,37 @@ export interface PaginatedResponse<T> {
   success: boolean;
   data: T[];
   meta: PaginationMeta;
+}
+
+// ─── Invoice types ───────────────────────────────────────────────────────────
+
+export type InvoiceWithRelations = Invoice & {
+  items: InvoiceItem[];
+  client: Pick<Client, "id" | "name" | "phone" | "email" | "nif">;
+  appointment?: Pick<Appointment, "id" | "startAt" | "endAt"> | null;
+};
+
+export type InvoiceForClient = Omit<InvoiceWithRelations,
+  "baseImponible" | "ivaRate" | "ivaAmount" | "irpfRate" | "irpfAmount" | "total"
+> & {
+  baseImponible: number;
+  ivaRate: number;
+  ivaAmount: number;
+  irpfRate: number;
+  irpfAmount: number;
+  total: number;
+  items: Array<Omit<InvoiceItem, "unitPrice" | "totalPrice"> & {
+    unitPrice: number;
+    totalPrice: number;
+  }>;
+};
+
+export interface InvoiceFilters {
+  dateFrom?: string;
+  dateTo?: string;
+  clientId?: string;
+  status?: InvoiceStatus;
+  q?: string;
+  page?: number;
+  limit?: number;
 }

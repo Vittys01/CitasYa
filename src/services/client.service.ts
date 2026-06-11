@@ -13,7 +13,7 @@ export async function createClient(input: CreateClientInput, businessId: string)
 
   const email = input.email?.trim() || null;
   return prisma.client.create({
-    data: { businessId, name: input.name, phone, email, notes: input.notes ?? undefined },
+    data: { businessId, name: input.name, phone, email, notes: input.notes ?? undefined, nif: input.nif?.trim() || undefined },
   });
 }
 
@@ -21,7 +21,7 @@ export async function updateClient(
   id: string,
   input: UpdateClientInput
 ): Promise<Client> {
-  const data: { name?: string; phone?: string; email?: string | null; notes?: string } = { ...input };
+  const data: { name?: string; phone?: string; email?: string | null; notes?: string; nif?: string | null } = { ...input };
   if (input.phone) {
     const phone = normalisePhone(input.phone);
 

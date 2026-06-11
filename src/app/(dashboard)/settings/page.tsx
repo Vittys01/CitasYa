@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { canAccessStaffFeatures } from "@/lib/utils";
 import { redirect } from "next/navigation";
 import CurrencySettings from "@/components/settings/CurrencySettings";
+import TaxSettings from "@/components/settings/TaxSettings";
 import { getAppSettings } from "@/services/settings.service";
 
 export default async function SettingsPage() {
@@ -19,6 +20,10 @@ export default async function SettingsPage() {
       </div>
 
       <CurrencySettings settings={settings} />
+
+      {["OWNER", "ADMIN"].includes(session.user.role) && (
+        <TaxSettings businessId={businessId} />
+      )}
 
       <div className="rounded-xl border border-[#e6d5c3] bg-[#fbf6f1] p-5">
         <p className="text-sm text-[#7f6a5d]">

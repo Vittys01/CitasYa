@@ -51,6 +51,12 @@ enum MessageStatus {
   FAILED
 }
 
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  CANCELLED
+}
+
 // ─── Businesses (multi-tenant) ─────────────────────────────────────────────────
 
 model Business {
@@ -75,12 +81,25 @@ model Business {
   twilioAuthToken        String?
   twilioWhatsAppNumber   String?  // "whatsapp:+14155238886"
 
+  // Fiscal / invoice data
+  nif             String?    // NIF or CIF of the business
+  addressStreet   String?    // Street address
+  addressCity     String?    // City
+  addressProvince String?    // Province
+  addressPostal   String?    // Postal code
+  invoicePrefix   String?    // Prefix for invoice numbering (default "F")
+  nextInvoiceNum  Int        @default(1)
+  defaultIvaRate  Decimal    @default(21) @db.Decimal(5, 2)
+  defaultIrpfRate Decimal    @default(15) @db.Decimal(5, 2)
+  invoiceFooter   String?    // Custom footer text on invoices
+
   members       User[]       @relation("UserBusiness")
   manicurists   Manicurist[]
   clients       Client[]
   services      Service[]
   appSettings   AppSetting[]
   appointments  Appointment[]
+  invoices      Invoice[]
   whatsappBotSessions WhatsAppBotSession[]
   whatsappMessages WhatsAppMessage[]
 
@@ -209,6 +228,7 @@ model Service {
 
   appointments       Appointment[]
   appointmentServices AppointmentService[]
+  invoiceItems       InvoiceItem[]
 
   @@index([businessId])
   @@index([isActive])
@@ -240,10 +260,12 @@ model Client {
   phone      String   // E.164
   email      String?
   notes      String?
+  nif        String?   // Client NIF/NIE (for invoicing)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
   appointments Appointment[]
+  invoices     Invoice[]
 
   @@unique([businessId, phone])
   @@index([businessId])
@@ -273,6 +295,7 @@ model Appointment {
 
   notifications Notification[]
   services      AppointmentService[]
+  invoice       Invoice?
 
   @@index([businessId])
   @@index([manicuristId, startAt])
@@ -335,4 +358,72 @@ model Notification {
   @@index([appointmentId])
   @@index([status, scheduledFor])
   @@index([type])
+}
+
+// ─── Invoices (Spanish tax compliance) ──────────────────────────────────────────
+
+model Invoice {
+  id            String        @id @default(cuid())
+  businessId    String
+  business      Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  number        Int
+  prefix        String        @default("F")
+  formattedNumber String
+
+  appointmentId String?  @unique
+  appointment   Appointment?  @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+
+  clientId      String
+  client        Client        @relation(fields: [clientId], references: [id])
+  clientName    String
+  clientNif     String?
+  clientEmail   String?
+
+  businessName    String
+  businessNif     String?
+  businessAddress String?
+
+  issuedAt      DateTime
+  dueDate       DateTime?
+
+  status        InvoiceStatus @default(DRAFT)
+
+  baseImponible Decimal       @db.Decimal(12, 2)
+  ivaRate       Decimal       @db.Decimal(5, 2)
+  ivaAmount     Decimal       @db.Decimal(12, 2)
+  irpfRate      Decimal       @db.Decimal(5, 2)
+  irpfAmount    Decimal       @db.Decimal(12, 2)
+  total         Decimal       @db.Decimal(12, 2)
+
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  items         InvoiceItem[]
+
+  @@unique([businessId, number])
+  @@index([businessId])
+  @@index([clientId])
+  @@index([appointmentId])
+  @@index([status])
+  @@index([issuedAt])
+}
+
+model InvoiceItem {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  description String
+  quantity    Int        @default(1)
+  unitPrice   Decimal   @db.Decimal(10, 2)
+  totalPrice  Decimal   @db.Decimal(10, 2)
+
+  serviceId   String?
+  service     Service?  @relation(fields: [serviceId], references: [id])
+
+  sortOrder   Int        @default(0)
+
+  @@index([invoiceId])
 }

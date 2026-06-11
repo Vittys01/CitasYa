@@ -34,6 +34,16 @@ const updateSchema = z.object({
   twilioAccountSid: z.string().optional(),
   twilioAuthToken: z.string().optional(),
   twilioWhatsAppNumber: z.string().optional(),
+  // Fiscal / invoice data
+  nif: z.string().optional(),
+  addressStreet: z.string().optional(),
+  addressCity: z.string().optional(),
+  addressProvince: z.string().optional(),
+  addressPostal: z.string().optional(),
+  invoicePrefix: z.string().optional(),
+  defaultIvaRate: z.number().min(0).max(100).optional(),
+  defaultIrpfRate: z.number().min(0).max(100).optional(),
+  invoiceFooter: z.string().optional(),
 });
 
 export async function GET(

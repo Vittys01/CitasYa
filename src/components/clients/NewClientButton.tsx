@@ -10,7 +10,7 @@ const g = (s: Record<string, string> | undefined, k: string, fb: string) => (s &
 
 interface Props { settings?: Record<string, string> }
 
-type FormData = { name: string; phone: string; email?: string; notes?: string };
+type FormData = { name: string; phone: string; email?: string; notes?: string; nif?: string };
 
 const labelCls = "block text-xs font-semibold text-earth uppercase tracking-wider mb-1.5";
 const inputCls =
@@ -28,6 +28,7 @@ function buildSchema(s: Record<string, string> | undefined) {
       ),
     email: z.string().email(g(s, "validation.invalidEmail", "Email inválido")).optional().or(z.literal("")),
     notes: z.string().optional(),
+    nif: z.string().optional(),
   });
 }
 
@@ -101,6 +102,10 @@ export default function NewClientButton({ settings }: Props) {
               <div>
                 <label className={labelCls}>{g(settings, "form.field.internalNotes", "Notas internas")}</label>
                 <textarea {...register("notes")} rows={2} placeholder={g(settings, "form.placeholder.clientNotes", "Alergias, preferencias...")} className={`${inputCls} resize-none`} />
+              </div>
+              <div>
+                <label className={labelCls}>NIF / NIE (para facturas)</label>
+                <input type="text" {...register("nif")} placeholder="12345678A" className={inputCls} />
               </div>
 
               {error && (

@@ -20,6 +20,7 @@ const createSchema = z.object({
   phone: z.string().min(1).refine(phoneRefine, "Teléfono inválido (código país + número, 8-15 dígitos)"),
   email: z.union([z.string().email(), z.literal("")]).optional(),
   notes: z.string().optional(),
+  nif: z.string().optional(),
 });
 
 export async function GET(req: NextRequest) {

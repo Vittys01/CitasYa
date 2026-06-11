@@ -4,7 +4,7 @@
  */
 
 import type { Service } from "@prisma/client";
-import type { AppointmentWithRelations } from "@/types";
+import type { AppointmentWithRelations, InvoiceWithRelations, InvoiceForClient } from "@/types";
 
 /** Service with price as number for client */
 export type ServiceForClient = Omit<Service, "price"> & { price: number };
@@ -52,4 +52,22 @@ export function appointmentFromApiJson(raw: unknown): AppointmentForClient | nul
     });
   }
   return normalized as AppointmentForClient;
+}
+
+/** Serialize Invoice with Prisma Decimals to numbers — safe for Client Components */
+export function serializeInvoice(invoice: InvoiceWithRelations): InvoiceForClient {
+  return {
+    ...invoice,
+    baseImponible: Number(invoice.baseImponible),
+    ivaRate: Number(invoice.ivaRate),
+    ivaAmount: Number(invoice.ivaAmount),
+    irpfRate: Number(invoice.irpfRate),
+    irpfAmount: Number(invoice.irpfAmount),
+    total: Number(invoice.total),
+    items: invoice.items.map((item) => ({
+      ...item,
+      unitPrice: Number(item.unitPrice),
+      totalPrice: Number(item.totalPrice),
+    })),
+  } as InvoiceForClient;
 }

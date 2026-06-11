@@ -27,6 +27,7 @@ import {
   cancelScheduledReminder,
 } from "@/lib/notifications-scheduler";
 import { processNotification } from "@/services/notification.service";
+import { generateInvoiceFromAppointment } from "@/services/invoice.service";
 import type {
   CreateAppointmentInput,
   UpdateAppointmentInput,
@@ -228,6 +229,11 @@ export async function updateAppointment(
       where: { id },
       data: { status: "COMPLETED" },
       include: appointmentInclude,
+    });
+
+    // Auto-generate invoice (fire-and-forget)
+    void generateInvoiceFromAppointment(id).catch((err) => {
+      console.error(`[Invoice] Failed to generate for appointment ${id}:`, err);
     });
 
     return completed as AppointmentWithRelations;
@@ -574,14 +580,29 @@ export async function getNextAvailableSlots(
  * Returns the number of rows updated.
  */
 export async function autoCompleteExpiredAppointments(): Promise<number> {
-  const result = await prisma.appointment.updateMany({
+  const expired = await prisma.appointment.findMany({
     where: {
       status: "CONFIRMED",
       endAt: { lt: now() },
     },
+    select: { id: true },
+  });
+
+  if (expired.length === 0) return 0;
+
+  await prisma.appointment.updateMany({
+    where: { id: { in: expired.map((a) => a.id) } },
     data: { status: "COMPLETED" },
   });
-  return result.count;
+
+  // Auto-generate invoices for each completed appointment
+  for (const appt of expired) {
+    void generateInvoiceFromAppointment(appt.id).catch((err) => {
+      console.error(`[Invoice] Auto-generate failed for ${appt.id}:`, err);
+    });
+  }
+
+  return expired.length;
 }
 
 // ─── Private helpers ──────────────────────────────────────────────────────────
