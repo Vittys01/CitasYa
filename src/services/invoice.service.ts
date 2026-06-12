@@ -3,11 +3,11 @@
  *
  * - Auto-generate from completed appointments
  * - Sequential numbering per business (atomic)
- * - IVA + IRPF calculations
+ * - IVA calculations (IRPF disabled — exempt)
  */
 
 import { prisma } from "@/lib/db";
-import { buildPaginationMeta, now } from "@/lib/utils";
+import { buildPaginationMeta, now, canaryDate } from "@/lib/utils";
 import type { InvoiceWithRelations, InvoiceFilters } from "@/types";
 import type { InvoiceStatus } from "@prisma/client";
 
@@ -68,10 +68,10 @@ export async function generateInvoiceFromAppointment(
 
   const baseImponible = items.reduce((sum, i) => sum + i.totalPrice, 0);
   const ivaRate = Number(biz.defaultIvaRate);
-  const irpfRate = Number(biz.defaultIrpfRate);
   const ivaAmount = +(baseImponible * ivaRate / 100).toFixed(2);
-  const irpfAmount = +(baseImponible * irpfRate / 100).toFixed(2);
-  const total = +(baseImponible + ivaAmount - irpfAmount).toFixed(2);
+  const irpfRate = 0;
+  const irpfAmount = 0;
+  const total = +(baseImponible + ivaAmount).toFixed(2);
 
   // Format business address
   const addressParts = [
@@ -146,8 +146,8 @@ export async function getInvoices(
 
   if (dateFrom || dateTo) {
     where.issuedAt = {
-      ...(dateFrom ? { gte: new Date(dateFrom) } : {}),
-      ...(dateTo ? { lte: new Date(dateTo + "T23:59:59") } : {}),
+      ...(dateFrom ? { gte: canaryDate(dateFrom, 0, 0) } : {}),
+      ...(dateTo ? { lte: canaryDate(dateTo, 23, 59, 59) } : {}),
     };
   }
   if (clientId) where.clientId = clientId;

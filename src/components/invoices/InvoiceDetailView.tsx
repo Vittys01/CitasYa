@@ -61,7 +61,7 @@ export default function InvoiceDetailView({ invoice }: Props) {
           </h1>
           <p className="text-sm text-[#9c8273] mt-1">
             {new Date(invoice.issuedAt).toLocaleDateString("es-ES", {
-              day: "2-digit", month: "long", year: "numeric",
+              day: "2-digit", month: "long", year: "numeric", timeZone: "Atlantic/Canary",
             })}
           </p>
         </div>
@@ -163,10 +163,6 @@ export default function InvoiceDetailView({ invoice }: Props) {
             <div className="flex justify-between text-sm">
               <span className="text-[#7f6a5d]">IVA ({invoice.ivaRate}%)</span>
               <span>{EUR(invoice.ivaAmount)} EUR</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-[#7f6a5d]">IRPF ({invoice.irpfRate}%)</span>
-              <span className="text-red-600">-{EUR(invoice.irpfAmount)} EUR</span>
             </div>
             <div className="flex justify-between text-base font-bold border-t border-[#e6d5c3] pt-2">
               <span className="text-[#7f5539]">TOTAL</span>

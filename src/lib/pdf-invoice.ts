@@ -73,6 +73,7 @@ export async function generateInvoicePdf(
         day: "2-digit",
         month: "long",
         year: "numeric",
+        timeZone: "Atlantic/Canary",
       })
     : "";
   drawText(`Fecha de emision: ${dateStr}`, margin, y, { size: 9, color: muted });
@@ -142,10 +143,6 @@ export async function generateInvoicePdf(
   drawText(`IVA (${Number(invoice.ivaRate)}%)`, labelX, y, { size: 10 });
   drawText(`${EUR(Number(invoice.ivaAmount))} EUR`, valueX, y, { size: 10 });
   y -= 16;
-
-  drawText(`IRPF (${Number(invoice.irpfRate)}%)`, labelX, y, { size: 10, color: rgb(0.8, 0.2, 0.2) });
-  drawText(`-${EUR(Number(invoice.irpfAmount))} EUR`, valueX, y, { size: 10, color: rgb(0.8, 0.2, 0.2) });
-  y -= 8;
 
   // Total line
   page.drawLine({ start: { x: 350, y }, end: { x: width - margin, y }, thickness: 1, color: accent });

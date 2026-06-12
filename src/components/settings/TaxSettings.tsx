@@ -12,7 +12,6 @@ interface BusinessData {
   addressPostal: string;
   invoicePrefix: string;
   defaultIvaRate: number;
-  defaultIrpfRate: number;
   invoiceFooter: string;
 }
 
@@ -37,7 +36,6 @@ export default function TaxSettings({ businessId }: { businessId: string }) {
             addressPostal: r.data.addressPostal ?? "",
             invoicePrefix: r.data.invoicePrefix ?? "F",
             defaultIvaRate: Number(r.data.defaultIvaRate ?? 21),
-            defaultIrpfRate: Number(r.data.defaultIrpfRate ?? 15),
             invoiceFooter: r.data.invoiceFooter ?? "",
           });
         }
@@ -61,7 +59,6 @@ export default function TaxSettings({ businessId }: { businessId: string }) {
           addressPostal: data.addressPostal || null,
           invoicePrefix: data.invoicePrefix || "F",
           defaultIvaRate: data.defaultIvaRate,
-          defaultIrpfRate: data.defaultIrpfRate,
           invoiceFooter: data.invoiceFooter || null,
         }),
       });
@@ -94,7 +91,7 @@ export default function TaxSettings({ businessId }: { businessId: string }) {
           Datos fiscales
         </h2>
         <p className="text-xs text-earth-muted mt-0.5">
-          Configura los datos que aparecen en las facturas (NIF, direccion, tipos de IVA e IRPF)
+          Configura los datos fiscales que aparecen en las facturas
         </p>
       </div>
 
@@ -166,27 +163,15 @@ export default function TaxSettings({ businessId }: { businessId: string }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className={labelCls}>IVA por defecto (%)</label>
-            <input
-              type="number"
-              step="0.01"
-              value={data.defaultIvaRate}
-              onChange={(e) => setData({ ...data, defaultIvaRate: parseFloat(e.target.value) || 0 })}
-              className={inputCls}
-            />
-          </div>
-          <div>
-            <label className={labelCls}>IRPF por defecto (%)</label>
-            <input
-              type="number"
-              step="0.01"
-              value={data.defaultIrpfRate}
-              onChange={(e) => setData({ ...data, defaultIrpfRate: parseFloat(e.target.value) || 0 })}
-              className={inputCls}
-            />
-          </div>
+        <div>
+          <label className={labelCls}>IVA por defecto (%)</label>
+          <input
+            type="number"
+            step="0.01"
+            value={data.defaultIvaRate}
+            onChange={(e) => setData({ ...data, defaultIvaRate: parseFloat(e.target.value) || 0 })}
+            className={inputCls}
+          />
         </div>
 
         <div>

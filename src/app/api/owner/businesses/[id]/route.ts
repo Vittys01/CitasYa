@@ -42,7 +42,6 @@ const updateSchema = z.object({
   addressPostal: z.string().optional(),
   invoicePrefix: z.string().optional(),
   defaultIvaRate: z.number().min(0).max(100).optional(),
-  defaultIrpfRate: z.number().min(0).max(100).optional(),
   invoiceFooter: z.string().optional(),
 });
 
