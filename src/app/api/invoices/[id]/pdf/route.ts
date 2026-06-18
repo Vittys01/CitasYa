@@ -1,5 +1,9 @@
 /**
  * GET /api/invoices/[id]/pdf  — download PDF
+ *
+ * Query params:
+ *   ?formato=a4|recibo  (default: recibo)
+ *   ?ancho=58|80        (default: 58, only for recibo)
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -8,11 +12,12 @@ import { resolveBusinessIdFromSession } from "@/lib/resolve-business-session";
 import { apiError } from "@/lib/utils";
 import { getInvoice } from "@/services/invoice.service";
 import { generateInvoicePdf } from "@/lib/pdf-invoice";
+import { generateReceiptPdf } from "@/lib/thermal-receipt";
 
 const INVOICE_ROLES = ["OWNER", "ADMIN"] as const;
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
@@ -27,12 +32,29 @@ export async function GET(
   const invoice = await getInvoice(id, businessId);
   if (!invoice) return NextResponse.json(apiError("Not found"), { status: 404 });
 
-  const pdfBytes = await generateInvoicePdf(invoice);
+  const { searchParams } = new URL(req.url);
+  const formato = searchParams.get("formato") || "recibo";
 
+  if (formato === "a4") {
+    const pdfBytes = await generateInvoicePdf(invoice);
+    return new Response(Buffer.from(pdfBytes), {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `inline; filename="factura-${invoice.formattedNumber}.pdf"`,
+      },
+    });
+  }
+
+  const anchoParam = searchParams.get("ancho") || "58";
+  const ancho = anchoParam === "80" ? 80 : 58;
+
+  const pdfBytes = await generateReceiptPdf(invoice, ancho);
+
+  const suffix = ancho === 80 ? "80mm" : "58mm";
   return new Response(Buffer.from(pdfBytes), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="factura-${invoice.formattedNumber}.pdf"`,
+      "Content-Disposition": `inline; filename="ticket-${invoice.formattedNumber}-${suffix}.pdf"`,
     },
   });
 }

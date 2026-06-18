@@ -3,7 +3,9 @@
  *
  * - Auto-generate from completed appointments
  * - Sequential numbering per business (atomic)
- * - IVA calculations (IRPF disabled — exempt)
+ * - Prices stored in DB are FINAL PRICES (IVA incluido).
+ *   The invoice extracts base imponible and IVA from the total.
+ * - IRPF disabled — exempt
  */
 
 import { prisma } from "@/lib/db";
@@ -66,12 +68,13 @@ export async function generateInvoiceFromAppointment(
         sortOrder: 0,
       }];
 
-  const baseImponible = items.reduce((sum, i) => sum + i.totalPrice, 0);
+  // Precios en DB son finales (IVA incluido) — extraer base y cuota
+  const total = items.reduce((sum, i) => sum + i.totalPrice, 0);
   const ivaRate = Number(biz.defaultIvaRate);
-  const ivaAmount = +(baseImponible * ivaRate / 100).toFixed(2);
+  const baseImponible = +(total / (1 + ivaRate / 100)).toFixed(2);
+  const ivaAmount = +(total - baseImponible).toFixed(2);
   const irpfRate = 0;
   const irpfAmount = 0;
-  const total = +(baseImponible + ivaAmount).toFixed(2);
 
   // Format business address
   const addressParts = [

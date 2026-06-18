@@ -11,22 +11,26 @@ const EUR = (n: number) =>
   n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function InvoiceDetailView({ invoice }: Props) {
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<string | null>(null);
 
-  const handleDownload = async () => {
-    setLoading(true);
+  const handleDownload = async (formato: string, ancho?: string) => {
+    const key = ancho ? `${formato}-${ancho}` : formato;
+    setLoading(key);
     try {
-      const res = await fetch(`/api/invoices/${invoice.id}/pdf`);
+      const params = new URLSearchParams({ formato });
+      if (ancho) params.set("ancho", ancho);
+      const res = await fetch(`/api/invoices/${invoice.id}/pdf?${params}`);
       if (!res.ok) return;
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `factura-${invoice.formattedNumber}.pdf`;
+      const suffix = ancho ? `-${ancho}mm` : "";
+      a.download = `factura-${invoice.formattedNumber}${suffix}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
     } finally {
-      setLoading(false);
+      setLoading(null);
     }
   };
 
@@ -75,12 +79,28 @@ export default function InvoiceDetailView({ invoice }: Props) {
       {/* Action buttons */}
       <div className="flex flex-wrap gap-3">
         <button
-          onClick={handleDownload}
-          disabled={loading}
+          onClick={() => handleDownload("recibo", "58")}
+          disabled={loading !== null}
           className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#7f5539] text-white text-sm font-semibold hover:bg-[#6d4a32] transition-colors shadow-warm-sm disabled:opacity-50"
         >
+          <span className="material-symbols-outlined text-[18px]">receipt</span>
+          {loading === "recibo-58" ? "Generando..." : "Ticket 58mm"}
+        </button>
+        <button
+          onClick={() => handleDownload("recibo", "80")}
+          disabled={loading !== null}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#7f5539] text-white text-sm font-semibold hover:bg-[#6d4a32] transition-colors shadow-warm-sm disabled:opacity-50"
+        >
+          <span className="material-symbols-outlined text-[18px]">receipt_long</span>
+          {loading === "recibo-80" ? "Generando..." : "Ticket 80mm"}
+        </button>
+        <button
+          onClick={() => handleDownload("a4")}
+          disabled={loading !== null}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-[#D7CCC8] text-[#4a3b32] text-sm font-semibold hover:bg-[#fbf6f1] transition-colors disabled:opacity-50"
+        >
           <span className="material-symbols-outlined text-[18px]">picture_as_pdf</span>
-          {loading ? "Generando..." : "Descargar PDF"}
+          {loading === "a4" ? "Generando..." : "PDF A4"}
         </button>
         {invoice.status === "DRAFT" && (
           <button
