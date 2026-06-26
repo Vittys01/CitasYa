@@ -69,10 +69,13 @@ export async function generateInvoicePdf(
   ) => draw(text, size, { ...opts, x: right - tw(text, size, opts.bold) });
 
   const sep = () => {
-    const charW = tw("─", 8);
-    const count = Math.floor(colW / charW);
-    draw("─".repeat(count), 8, { center: true, color: muted });
-    y -= 6;
+    page.drawLine({
+      start: { x: left, y: y - 8 },
+      end: { x: right, y: y - 8 },
+      thickness: 0.5,
+      color: muted,
+    });
+    y -= 14;
   };
 
   const gap = (h: number) => { y -= h; };

@@ -96,9 +96,13 @@ export async function generateReceiptPdf(
     draw(text, size, { ...opts, x: pageWidth - m - tw(text, size, opts.bold) });
 
   const sep = () => {
-    const line = "─".repeat(Math.floor(cw / tw("─", F.small)));
-    draw(line, F.small, { center: true, color: gray });
-    y -= 4;
+    page.drawLine({
+      start: { x: m, y: y - F.small },
+      end: { x: pageWidth - m, y: y - F.small },
+      thickness: 0.5,
+      color: gray,
+    });
+    y -= F.small + 4;
   };
 
   const gap = (h: number) => { y -= h; };
