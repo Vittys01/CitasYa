@@ -22,7 +22,8 @@
     "worker": "tsx src/jobs/worker.ts",
     "worker:dev": "tsx watch src/jobs/worker.ts",
     "migrate:canary-time": "tsx prisma/migrate-appointments-to-canary-time.ts",
-    "migrate:invoices": "tsx prisma/regenerate-invoices.ts"
+    "migrate:invoices": "tsx prisma/regenerate-invoices.ts",
+    "migrate:no-iva": "tsx prisma/update-invoices-no-iva.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.7.2",

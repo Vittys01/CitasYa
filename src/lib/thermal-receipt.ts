@@ -1,5 +1,6 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import type { InvoiceWithRelations } from "@/types";
+import { getLogoBytes } from "@/lib/logo";
 
 const EUR = (n: number) =>
   n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -17,6 +18,17 @@ export async function generateReceiptPdf(
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
+  // Logo (optional — gracefully degrades if missing)
+  let logoImg: Awaited<ReturnType<PDFDocument["embedPng"]>> | null = null;
+  const logoBytes = getLogoBytes();
+  if (logoBytes) {
+    try {
+      logoImg = await pdfDoc.embedPng(logoBytes);
+    } catch {
+      logoImg = null;
+    }
+  }
+
   const pageWidth = WIDTHS[paperWidth];
   const m = 16;
   const cw = pageWidth - m * 2;
@@ -30,9 +42,15 @@ export async function generateReceiptPdf(
     total: is80 ? 18 : 14,
   };
 
+  const logoW = is80 ? 80 : 55;
+  const logoH = logoImg ? (logoImg.height / logoImg.width) * logoW : 0;
+
+  const hasIva = Number(invoice.ivaRate) > 0;
+
   // ── Height estimate ──────────────────────────────────────────────────
   const L = (h: number) => { calcY += h; };
   let calcY = m;
+  if (logoImg) { L(logoH + 6); }  // logo
   L(F.subtitle + 6);
   if (invoice.businessNif) L(F.small + 2);
   if (invoice.businessAddress) L(F.small + 2);
@@ -47,7 +65,7 @@ export async function generateReceiptPdf(
   L(F.small + 4);
   for (const _ of invoice.items) L(is80 ? F.body + F.small + 8 : F.body + 10);
   L(4); L(0.5); L(8);
-  if (is80) { L(F.small + 4); L(F.small + 4); L(4); L(0.5); }
+  if (hasIva && is80) { L(F.small + 4); L(F.small + 4); L(4); L(0.5); }
   L(F.total + 12);
   L(0.5); L(8);
   L(F.small + 4);
@@ -84,6 +102,17 @@ export async function generateReceiptPdf(
   };
 
   const gap = (h: number) => { y -= h; };
+
+  // ── Logo ─────────────────────────────────────────────────────────────
+  if (logoImg) {
+    page.drawImage(logoImg, {
+      x: (pageWidth - logoW) / 2,
+      y: y - logoH,
+      width: logoW,
+      height: logoH,
+    });
+    y -= logoH + 4;
+  }
 
   // ── Header ───────────────────────────────────────────────────────────
   draw(invoice.businessName, F.subtitle, { bold: true, center: true });
@@ -139,7 +168,7 @@ export async function generateReceiptPdf(
   sep();
 
   // ── Totals ───────────────────────────────────────────────────────────
-  if (is80) {
+  if (hasIva && is80) {
     right(`Base imponible  ${EUR(Number(invoice.baseImponible))} EUR`, F.small);
     right(`IVA (${Number(invoice.ivaRate)}%)  ${EUR(Number(invoice.ivaAmount))} EUR`, F.small);
     gap(4);

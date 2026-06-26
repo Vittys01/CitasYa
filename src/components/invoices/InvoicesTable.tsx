@@ -25,6 +25,7 @@ const EUR = (n: number) =>
 
 export default function InvoicesTable({ invoices, meta }: Props) {
   const [page, setPage] = useState(meta.page);
+  const showIva = invoices.some((inv) => inv.ivaRate > 0);
 
   const handleDownload = async (id: string, number: string) => {
     const res = await fetch(`/api/invoices/${id}/pdf`);
@@ -56,8 +57,8 @@ export default function InvoicesTable({ invoices, meta }: Props) {
               <th className="text-left px-4 py-3 font-semibold">Numero</th>
               <th className="text-left px-4 py-3 font-semibold hidden sm:table-cell">Fecha</th>
               <th className="text-left px-4 py-3 font-semibold">Cliente</th>
-              <th className="text-right px-4 py-3 font-semibold hidden md:table-cell">Base</th>
-              <th className="text-right px-4 py-3 font-semibold hidden md:table-cell">IVA</th>
+              {showIva && <th className="text-right px-4 py-3 font-semibold hidden md:table-cell">Base</th>}
+              {showIva && <th className="text-right px-4 py-3 font-semibold hidden md:table-cell">IVA</th>}
               <th className="text-right px-4 py-3 font-semibold">Total</th>
               <th className="text-center px-4 py-3 font-semibold">Estado</th>
               <th className="text-right px-4 py-3 font-semibold">Acciones</th>
@@ -66,7 +67,7 @@ export default function InvoicesTable({ invoices, meta }: Props) {
           <tbody className="divide-y divide-[#f0e6dc]">
             {invoices.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-[#9c8273]">
+                <td colSpan={showIva ? 8 : 6} className="px-4 py-8 text-center text-[#9c8273]">
                   No hay facturas emitidas todavia
                 </td>
               </tr>
@@ -82,8 +83,8 @@ export default function InvoicesTable({ invoices, meta }: Props) {
                     {new Date(inv.issuedAt).toLocaleDateString("es-ES", { timeZone: "Atlantic/Canary" })}
                   </td>
                   <td className="px-4 py-3">{inv.clientName}</td>
-                  <td className="px-4 py-3 text-right hidden md:table-cell">{EUR(inv.baseImponible)}</td>
-                  <td className="px-4 py-3 text-right hidden md:table-cell">{EUR(inv.ivaAmount)}</td>
+                  {showIva && <td className="px-4 py-3 text-right hidden md:table-cell">{EUR(inv.baseImponible)}</td>}
+                  {showIva && <td className="px-4 py-3 text-right hidden md:table-cell">{EUR(inv.ivaAmount)}</td>}
                   <td className="px-4 py-3 text-right font-semibold">{EUR(inv.total)} EUR</td>
                   <td className="px-4 py-3 text-center">
                     <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge[inv.status] ?? ""}`}>

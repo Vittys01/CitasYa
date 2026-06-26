@@ -176,14 +176,18 @@ export default function InvoiceDetailView({ invoice }: Props) {
         {/* Totals */}
         <div className="border-t border-[#e6d5c3] bg-[#fbf6f1] p-6">
           <div className="ml-auto max-w-xs space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-[#7f6a5d]">Base imponible</span>
-              <span>{EUR(invoice.baseImponible)} EUR</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-[#7f6a5d]">IVA ({invoice.ivaRate}%)</span>
-              <span>{EUR(invoice.ivaAmount)} EUR</span>
-            </div>
+            {invoice.ivaRate > 0 && (
+              <>
+                <div className="flex justify-between text-sm">
+                  <span className="text-[#7f6a5d]">Base imponible</span>
+                  <span>{EUR(invoice.baseImponible)} EUR</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-[#7f6a5d]">IVA ({invoice.ivaRate}%)</span>
+                  <span>{EUR(invoice.ivaAmount)} EUR</span>
+                </div>
+              </>
+            )}
             <div className="flex justify-between text-base font-bold border-t border-[#e6d5c3] pt-2">
               <span className="text-[#7f5539]">TOTAL</span>
               <span className="text-[#7f5539]">{EUR(invoice.total)} EUR</span>

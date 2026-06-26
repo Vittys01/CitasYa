@@ -1,10 +1,13 @@
 /**
- * PDF Invoice Generator — Spanish tax-compliant factura.
+ * PDF Invoice Generator — Receipt-style format (Canary Islands, no IVA).
+ *
  * Uses pdf-lib for pure JS PDF generation (no Chromium needed).
+ * Layout mirrors the thermal receipt so A4 and ticket formats match.
  */
 
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import type { InvoiceWithRelations } from "@/types";
+import { getLogoBytes } from "@/lib/logo";
 
 const EUR = (n: number) =>
   n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -17,167 +20,162 @@ export async function generateInvoicePdf(
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-  const { width, height } = page.getSize();
-  const margin = 50;
-  let y = height - margin;
+  // Logo (optional — gracefully degrades if missing)
+  let logoImg: Awaited<ReturnType<PDFDocument["embedPng"]>> | null = null;
+  const logoBytes = getLogoBytes();
+  if (logoBytes) {
+    try {
+      logoImg = await pdfDoc.embedPng(logoBytes);
+    } catch {
+      logoImg = null;
+    }
+  }
+
+  // ── Layout constants ─────────────────────────────────────────────────
+  const pageW = page.getWidth();
+  const colW = 320;                   // centered receipt column
+  const left = (pageW - colW) / 2;
+  const right = left + colW;
+  let y = 800;
 
   // Colors
-  const dark = rgb(0.29, 0.23, 0.2);     // #4a3b32
-  const muted = rgb(0.61, 0.51, 0.45);   // #9c8273
-  const accent = rgb(0.5, 0.33, 0.22);   // #7f5539
-  const lineColor = rgb(0.9, 0.84, 0.76); // #e6d5c3
-  const white = rgb(1, 1, 1);
+  const dark = rgb(0.29, 0.23, 0.2);
+  const muted = rgb(0.61, 0.51, 0.45);
+  const accent = rgb(0.5, 0.33, 0.22);
+  const gray = rgb(0.4, 0.4, 0.4);
 
-  const drawText = (
+  const hasIva = Number(invoice.ivaRate) > 0;
+
+  // ── Helpers ──────────────────────────────────────────────────────────
+  const tw = (text: string, size: number, bold = false) =>
+    (bold ? fontBold : font).widthOfTextAtSize(text, size);
+
+  const draw = (
     text: string,
-    x: number,
-    yPos: number,
-    opts: { size?: number; bold?: boolean; color?: typeof dark } = {}
+    size: number,
+    opts: { bold?: boolean; center?: boolean; color?: typeof dark; x?: number } = {}
   ) => {
     const f = opts.bold ? fontBold : font;
-    const size = opts.size ?? 10;
-    const c = opts.color ?? dark;
-    page.drawText(text, { x, y: yPos, size, font: f, color: c });
+    const w = tw(text, size, opts.bold);
+    const x = opts.center ? left + (colW - w) / 2 : opts.x ?? left;
+    page.drawText(text, { x, y: y - size, size, font: f, color: opts.color ?? dark });
+    return w;
   };
 
-  // ─── Header ───────────────────────────────────────────────────────────────
+  const rightAlign = (
+    text: string,
+    size: number,
+    opts: { bold?: boolean; color?: typeof dark } = {}
+  ) => draw(text, size, { ...opts, x: right - tw(text, size, opts.bold) });
 
-  // Business name
-  drawText(invoice.businessName, margin, y, { size: 18, bold: true, color: accent });
-  y -= 18;
+  const sep = () => {
+    const charW = tw("─", 8);
+    const count = Math.floor(colW / charW);
+    draw("─".repeat(count), 8, { center: true, color: muted });
+    y -= 6;
+  };
 
-  // Business info
-  if (invoice.businessNif) {
-    drawText(`NIF: ${invoice.businessNif}`, margin, y, { size: 9, color: muted });
-    y -= 14;
+  const gap = (h: number) => { y -= h; };
+
+  // ── Logo ─────────────────────────────────────────────────────────────
+  if (logoImg) {
+    const logoW = 90;
+    const logoH = (logoImg.height / logoImg.width) * logoW;
+    page.drawImage(logoImg, {
+      x: left + (colW - logoW) / 2,
+      y: y - logoH,
+      width: logoW,
+      height: logoH,
+    });
+    y -= logoH + 8;
   }
-  if (invoice.businessAddress) {
-    drawText(invoice.businessAddress, margin, y, { size: 9, color: muted });
-    y -= 14;
-  }
-  y -= 10;
 
-  // Separator line
-  page.drawLine({ start: { x: margin, y }, end: { x: width - margin, y }, thickness: 1, color: lineColor });
-  y -= 25;
+  // ── Header ───────────────────────────────────────────────────────────
+  draw(invoice.businessName, 13, { bold: true, center: true, color: accent });
+  y -= 4;
+  if (invoice.businessNif) draw(`NIF: ${invoice.businessNif}`, 8.5, { center: true, color: muted });
+  if (invoice.businessAddress) draw(invoice.businessAddress, 8.5, { center: true, color: muted });
+  gap(8);
+  sep();
+  gap(6);
 
-  // ─── Invoice title + number ───────────────────────────────────────────────
-
-  drawText("FACTURA", margin, y, { size: 22, bold: true, color: accent });
-  drawText(invoice.formattedNumber, width - margin - fontBold.widthOfTextAtSize(invoice.formattedNumber, 14), y, { size: 14, bold: true });
-  y -= 25;
-
-  // Date
+  // ── Title ────────────────────────────────────────────────────────────
+  draw("FACTURA", 18, { bold: true, center: true, color: accent });
+  draw(invoice.formattedNumber, 11, { center: true, bold: true });
+  y -= 4;
   const dateStr = invoice.issuedAt
     ? new Date(invoice.issuedAt).toLocaleDateString("es-ES", {
-        day: "2-digit",
-        month: "long",
-        year: "numeric",
-        timeZone: "Atlantic/Canary",
+        day: "2-digit", month: "long", year: "numeric", timeZone: "Atlantic/Canary",
       })
     : "";
-  drawText(`Fecha de emision: ${dateStr}`, margin, y, { size: 9, color: muted });
-  y -= 25;
+  draw(dateStr, 8.5, { center: true, color: muted });
+  gap(8);
+  sep();
+  gap(6);
 
-  // ─── Client section ───────────────────────────────────────────────────────
+  // ── Client ───────────────────────────────────────────────────────────
+  draw("CLIENTE", 8, { bold: true, color: muted });
+  draw(invoice.clientName, 10);
+  if (invoice.clientNif) draw(`NIF: ${invoice.clientNif}`, 8.5, { color: muted });
+  gap(8);
+  sep();
 
-  drawText("DATOS DEL CLIENTE", margin, y, { size: 10, bold: true });
-  y -= 16;
-  drawText(invoice.clientName, margin, y, { size: 10 });
-  if (invoice.clientNif) {
-    drawText(`NIF: ${invoice.clientNif}`, margin, y - 14, { size: 9, color: muted });
-    y -= 14;
-  }
-  y -= 20;
+  // ── Items header ─────────────────────────────────────────────────────
+  draw("Concepto", 8, { bold: true, color: muted });
+  rightAlign("Total", 8, { bold: true, color: muted });
+  y -= 4;
+  sep();
 
-  // ─── Items table ──────────────────────────────────────────────────────────
-
-  // Table header
-  const colDesc = margin;
-  const colQty = 340;
-  const colPrice = 400;
-  const colTotal = width - margin - 70;
-
-  // Header background
-  page.drawRectangle({
-    x: margin,
-    y: y - 4,
-    width: width - margin * 2,
-    height: 20,
-    color: rgb(0.96, 0.93, 0.91),
-  });
-
-  drawText("Concepto", colDesc, y, { size: 9, bold: true, color: muted });
-  drawText("Ud.", colQty, y, { size: 9, bold: true, color: muted });
-  drawText("Precio", colPrice, y, { size: 9, bold: true, color: muted });
-  drawText("Total", colTotal, y, { size: 9, bold: true, color: muted });
-  y -= 22;
-
-  // Line items
+  // ── Items ────────────────────────────────────────────────────────────
   for (const item of invoice.items) {
-    const desc = item.description.length > 45
-      ? item.description.substring(0, 42) + "..."
-      : item.description;
-    drawText(desc, colDesc, y, { size: 10 });
-    drawText(String(item.quantity), colQty, y, { size: 10 });
-    drawText(`${EUR(Number(item.unitPrice))} EUR`, colPrice, y, { size: 10 });
-    drawText(`${EUR(Number(item.totalPrice))} EUR`, colTotal, y, { size: 10 });
-    y -= 18;
+    const itemTotal = `${EUR(Number(item.totalPrice))} EUR`;
+    const maxDesc = colW - tw(`${itemTotal}  `, 10) - 4;
+    let desc = item.description;
+    if (tw(desc, 10) > maxDesc) {
+      while (tw(desc + "…", 10) > maxDesc && desc.length > 1) desc = desc.slice(0, -1);
+      desc += "…";
+    }
+    draw(desc, 10);
+    rightAlign(itemTotal, 10, { bold: true });
+    if (item.quantity > 1 || Number(item.unitPrice) !== Number(item.totalPrice)) {
+      draw(`${item.quantity} ud. x ${EUR(Number(item.unitPrice))} EUR`, 8, { color: muted });
+    }
+    y -= 4;
+  }
+  gap(6);
+  sep();
+
+  // ── Totals ───────────────────────────────────────────────────────────
+  if (hasIva) {
+    rightAlign(`Base imponible  ${EUR(Number(invoice.baseImponible))} EUR`, 9, { color: muted });
+    y -= 4;
+    rightAlign(`IVA (${Number(invoice.ivaRate)}%)  ${EUR(Number(invoice.ivaAmount))} EUR`, 9, { color: muted });
+    y -= 6;
+    sep();
   }
 
-  y -= 10;
+  gap(4);
+  const totalStr = `TOTAL  ${EUR(Number(invoice.total))} EUR`;
+  draw(totalStr, 16, { bold: true, center: true, color: accent });
+  sep();
 
-  // ─── Totals ───────────────────────────────────────────────────────────────
-
-  // Separator
-  page.drawLine({ start: { x: 350, y }, end: { x: width - margin, y }, thickness: 0.5, color: lineColor });
-  y -= 16;
-
-  const labelX = 350;
-  const valueX = width - margin - 70;
-
-  drawText("Base imponible", labelX, y, { size: 10 });
-  drawText(`${EUR(Number(invoice.baseImponible))} EUR`, valueX, y, { size: 10 });
-  y -= 16;
-
-  drawText(`IVA (${Number(invoice.ivaRate)}%)`, labelX, y, { size: 10 });
-  drawText(`${EUR(Number(invoice.ivaAmount))} EUR`, valueX, y, { size: 10 });
-  y -= 16;
-
-  // Total line
-  page.drawLine({ start: { x: 350, y }, end: { x: width - margin, y }, thickness: 1, color: accent });
-  y -= 18;
-
-  drawText("TOTAL", labelX, y, { size: 13, bold: true, color: accent });
-  drawText(`${EUR(Number(invoice.total))} EUR`, valueX, y, { size: 13, bold: true, color: accent });
-
-  y -= 50;
-
-  // ─── Status badge ─────────────────────────────────────────────────────────
-
-  const statusText = invoice.status === "DRAFT" ? "BORRADOR" :
-    invoice.status === "ISSUED" ? "EMITIDA" :
-    invoice.status === "CANCELLED" ? "ANULADA" : invoice.status;
-
+  // ── Status ───────────────────────────────────────────────────────────
+  const statusLabels: Record<string, string> = {
+    DRAFT: "BORRADOR", ISSUED: "EMITIDA", CANCELLED: "ANULADA",
+  };
   const statusColor = invoice.status === "CANCELLED"
     ? rgb(0.8, 0.2, 0.2)
     : invoice.status === "DRAFT"
       ? muted
       : rgb(0.2, 0.6, 0.3);
+  draw(`Estado: ${statusLabels[invoice.status] ?? invoice.status}`, 8.5, { center: true, color: statusColor });
+  gap(8);
 
-  drawText(`Estado: ${statusText}`, margin, y, { size: 9, bold: true, color: statusColor });
-
-  // ─── Footer ───────────────────────────────────────────────────────────────
-
-  y = 70;
-  page.drawLine({ start: { x: margin, y: y + 15 }, end: { x: width - margin, y: y + 15 }, thickness: 0.5, color: lineColor });
-
+  // ── Footer ───────────────────────────────────────────────────────────
   if (invoice.notes) {
-    drawText(`Notas: ${invoice.notes}`, margin, y, { size: 8, color: muted });
-    y -= 12;
+    draw(invoice.notes, 8, { center: true, color: muted });
   }
-
-  drawText("Factura generada automaticamente por CitasYa", margin, 40, { size: 7, color: muted });
+  draw("Factura generada automaticamente", 7.5, { center: true, color: gray });
 
   return pdfDoc.save();
 }
