@@ -54,6 +54,8 @@ type SelectedService = {
   /** Precio de esta línea (si no, catálogo). */
   price?: number;
   priceDisplay?: string;
+  /** Profesional que realiza este servicio. */
+  manicuristId?: string;
 };
 
 function lineDurationMinutes(item: SelectedService, svc: ServiceForClient | undefined): number {
@@ -125,8 +127,11 @@ export default function NewAppointmentButton({
   const [clientFilter, setClientFilter] = useState("");
   const [clientShowDropdown, setClientShowDropdown] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState("");
-  const filteredClients = clientFilter
-    ? clientsList.filter((c) => c.name.toLowerCase().startsWith(clientFilter.toLowerCase()))
+  const filteredClients = clientFilter.trim()
+    ? clientsList.filter((c) => {
+        const q = clientFilter.toLowerCase().trim();
+        return c.name.toLowerCase().includes(q) || (c.phone && c.phone.includes(clientFilter.trim()));
+      }).slice(0, 10)
     : clientsList.slice(0, 10);
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -445,6 +450,7 @@ export default function NewAppointmentButton({
             serviceId: s.serviceId,
             durationMinutes: s.durationMinutes ?? undefined,
             price: s.price,
+            manicuristId: s.manicuristId ?? undefined,
           }))
         : [{ serviceId: a.serviceId }]
     );
@@ -592,6 +598,7 @@ export default function NewAppointmentButton({
           serviceId: s.serviceId,
           durationMinutes: dur,
           price: priceLine,
+          manicuristId: s.manicuristId || undefined,
         };
       });
       const priceForSubmit = (() => {
@@ -639,7 +646,14 @@ export default function NewAppointmentButton({
       }
       const raw = (json as { data?: unknown }).data;
       const merged = raw ? appointmentFromApiJson(raw) : null;
-      if (merged && onAppointmentSaved) onAppointmentSaved(merged);
+      if (merged && onAppointmentSaved) {
+        // Si la respuesta es un array, llamar al callback por cada uno
+        if (Array.isArray(merged)) {
+          merged.forEach((a) => onAppointmentSaved(a));
+        } else {
+          onAppointmentSaved(merged);
+        }
+      }
       reset();
       if (isControlled) controlledOnClose?.();
       else setInternalOpen(false);
@@ -995,6 +1009,27 @@ export default function NewAppointmentButton({
                                 className="w-24 min-w-0 px-2 py-1 text-xs border border-[#D7CCC8] rounded bg-white"
                               />
                             </div>
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className="text-[10px] text-earth-muted whitespace-nowrap">
+                                {g(settings, "form.field.manicurist", "Profesional")}:
+                              </span>
+                              <select
+                                value={item.manicuristId ?? ""}
+                                onChange={(e) =>
+                                  setSelectedServices((prev) =>
+                                    prev.map((s, i) =>
+                                      i === idx ? { ...s, manicuristId: e.target.value || undefined } : s
+                                    )
+                                  )
+                                }
+                                className="w-auto max-w-[130px] px-2 py-1 text-xs border border-[#D7CCC8] rounded bg-white"
+                              >
+                                <option value="">{lockedManicuristId ? manicurists.find(m => m.id === lockedManicuristId)?.user.name : (idx === 0 ? `${g(settings, "form.select.anyManicurist", "Cualquiera")}` : `${g(settings, "form.select.inherit", "Heredar")}`)}</option>
+                                {manicurists.map((m) => (
+                                  <option key={m.id} value={m.id}>{m.user.name}</option>
+                                ))}
+                              </select>
+                            </div>
                           </div>
                         </div>
                         <button
@@ -1013,7 +1048,8 @@ export default function NewAppointmentButton({
                     onChange={(e) => {
                       const id = e.target.value;
                       if (id) {
-                        setSelectedServices((prev) => [...prev, { serviceId: id }]);
+                        const manicuristId = selectedServices.length === 0 && manicuristFilter ? manicuristFilter : undefined;
+                        setSelectedServices((prev) => [...prev, { serviceId: id, manicuristId }]);
                         e.target.value = "";
                       }
                     }}
@@ -1057,11 +1093,12 @@ export default function NewAppointmentButton({
                             <button
                               key={s.id}
                               type="button"
-                              onClick={() => {
-                                setSelectedServices((prev) => [...prev, { serviceId: s.id }]);
-                                setServiceFilter("");
-                                setServiceShowDropdown(false);
-                              }}
+                        onClick={() => {
+                              const manicuristId = selectedServices.length === 0 && manicuristFilter ? manicuristFilter : undefined;
+                              setSelectedServices((prev) => [...prev, { serviceId: s.id, manicuristId }]);
+                              setServiceFilter("");
+                              setServiceShowDropdown(false);
+                            }}
                               className="w-full px-3 py-2 text-left text-sm hover:bg-primary/10 flex items-center justify-between"
                             >
                               <span className="font-medium text-earth">{s.name}</span>
