@@ -30,10 +30,11 @@ export async function GET(req: NextRequest) {
 
   const isManicurist = session.user.role === "MANICURIST";
   const manicuristId = isManicurist ? (session.user.manicuristId ?? undefined) : undefined;
+  const businessId = session.user.businessId ?? undefined;
 
   const [stats, productivity] = await Promise.all([
-    getDashboardStats(from, to, { manicuristId }),
-    isManicurist ? Promise.resolve([]) : getManicuristProductivity(from, to),
+    getDashboardStats(from, to, { businessId, manicuristId }),
+    isManicurist ? Promise.resolve([]) : getManicuristProductivity(from, to, businessId),
   ]);
 
   return NextResponse.json(apiSuccess({ stats, productivity }));

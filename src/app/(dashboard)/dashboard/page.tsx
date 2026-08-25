@@ -28,7 +28,7 @@ export default async function DashboardPage() {
     getDashboardStats(monthStart, canaryNow, { businessId, manicuristId: isManicurist ? manicuristId : undefined }),
     isManicurist
       ? Promise.resolve([])
-      : getManicuristProductivity(monthStart, canaryNow),
+      : getManicuristProductivity(monthStart, canaryNow, businessId),
     getAppointmentsByDate(canaryNow, { businessId, manicuristId: isManicurist ? manicuristId : undefined }),
   ]);
 
