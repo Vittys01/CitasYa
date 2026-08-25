@@ -13,6 +13,7 @@ import type {
   Invoice,
   InvoiceItem,
   InvoiceStatus,
+  PaymentMethod,
 } from "@prisma/client";
 
 // ─── Re-exports ───────────────────────────────────────────────────────────────
@@ -31,6 +32,7 @@ export type {
   Invoice,
   InvoiceItem,
   InvoiceStatus,
+  PaymentMethod,
 };
 
 // ─── Composed types ───────────────────────────────────────────────────────────
@@ -43,10 +45,12 @@ export type ManicuristWithUser = Manicurist & {
 export type AppointmentServiceWithService = {
   id: string;
   serviceId: string;
+  manicuristId: string | null;
   durationMinutes: number | null;
   price: { toNumber: () => number } | number;
   sortOrder: number;
   service: Pick<Service, "id" | "name" | "duration" | "color">;
+  manicurist?: { id: string; user: { name: string } } | null;
 };
 
 export type AppointmentWithRelations = Appointment & {
@@ -69,11 +73,16 @@ export interface AppointmentServiceInput {
   durationMinutes?: number; // null/undefined = usar duración del servicio
   /** Precio de esta línea en la cita (si no se envía, usa el precio del catálogo). */
   price?: number;
+  /** Profesional que realiza este servicio. Si no se envía, hereda el de la cita. */
+  manicuristId?: string;
+  /** Inicio propio de esta línea (ISO). Si se omite, continúa justo tras la línea anterior. */
+  startAt?: string;
 }
 
 export interface CreateAppointmentInput {
   clientId: string;
-  manicuristId: string;
+  /** Opcional: si no se envía, se deriva del primer servicio con manicuristId. */
+  manicuristId?: string;
   /** @deprecated Usar services. Si se pasa, se crea un solo servicio. */
   serviceId?: string;
   /** Múltiples servicios con duración personalizable */
@@ -104,6 +113,8 @@ export interface UpdateAppointmentInput {
   totalDurationMinutes?: number;
   /** Si es false, al guardar se cancela el recordatorio y no se reprograma (ni confirmación en creación). Por defecto true. */
   sendWhatsApp?: boolean;
+  /** Metodo de pago (al completar la cita). Efectivo = sin factura; Bizum/Datáfono = factura emitida. */
+  paymentMethod?: PaymentMethod;
 }
 
 export interface CreateClientInput {
@@ -185,10 +196,11 @@ export type InvoiceWithRelations = Invoice & {
   items: InvoiceItem[];
   client: Pick<Client, "id" | "name" | "phone" | "email" | "nif">;
   appointment?: Pick<Appointment, "id" | "startAt" | "endAt"> | null;
+  manicurist?: { id: string; user: { name: string } } | null;
 };
 
 export type InvoiceForClient = Omit<InvoiceWithRelations,
-  "baseImponible" | "ivaRate" | "ivaAmount" | "irpfRate" | "irpfAmount" | "total"
+  "baseImponible" | "ivaRate" | "ivaAmount" | "irpfRate" | "irpfAmount" | "total" | "manicurist"
 > & {
   baseImponible: number;
   ivaRate: number;
@@ -196,6 +208,7 @@ export type InvoiceForClient = Omit<InvoiceWithRelations,
   irpfRate: number;
   irpfAmount: number;
   total: number;
+  manicurist?: { id: string; name: string } | null;
   items: Array<Omit<InvoiceItem, "unitPrice" | "totalPrice"> & {
     unitPrice: number;
     totalPrice: number;
@@ -208,6 +221,8 @@ export interface InvoiceFilters {
   clientId?: string;
   status?: InvoiceStatus;
   q?: string;
+  manicuristId?: string;
+  paymentMethod?: PaymentMethod;
   page?: number;
   limit?: number;
 }

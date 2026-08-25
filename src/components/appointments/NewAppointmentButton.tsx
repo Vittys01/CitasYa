@@ -56,6 +56,8 @@ type SelectedService = {
   priceDisplay?: string;
   /** Profesional que realiza este servicio. */
   manicuristId?: string;
+  /** Hora de inicio propia ("HH:mm"). Vacío = continúa justo tras la línea anterior. */
+  startTime?: string;
 };
 
 function lineDurationMinutes(item: SelectedService, svc: ServiceForClient | undefined): number {
@@ -146,7 +148,7 @@ export default function NewAppointmentButton({
 
   // ── New-client inline form ────────────────────────────────────────────────────
   const [showNewClient, setShowNewClient] = useState(false);
-  const [newClient, setNewClient] = useState<NewClientForm>({ name: "", phone: "", email: "", notes: "" });
+  const [newClient, setNewClient] = useState<NewClientForm>({ name: "", phone: "+34 ", email: "", notes: "" });
   const [newClientLoading, setNewClientLoading] = useState(false);
   const [newClientError, setNewClientError] = useState("");
 
@@ -177,6 +179,9 @@ export default function NewAppointmentButton({
       const target = e.target as HTMLElement;
       if (!target.closest(".service-autocomplete")) {
         setServiceShowDropdown(false);
+      }
+      if (!target.closest(".mani-autocomplete")) {
+        setManiShowDropdown(false);
       }
     };
     document.addEventListener("click", handleClickOutside);
@@ -217,6 +222,8 @@ export default function NewAppointmentButton({
 
   // ── Slot state ──────────────────────────────────────────────────────────────
   const [manicuristFilter, setManicuristFilter] = useState<string>(lockedManicuristId ?? "");
+  const [maniFilter, setManiFilter] = useState("");
+  const [maniShowDropdown, setManiShowDropdown] = useState(false);
   const [slotOptions, setSlotOptions]   = useState<SlotOption[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
   /** Si está definido, se buscan turnos de este día; si no, se usan "próximos" */
@@ -228,6 +235,46 @@ export default function NewAppointmentButton({
   const [endHour, setEndHour] = useState("");
   const [endMinute, setEndMinute] = useState("");
   const [useEndTime, setUseEndTime] = useState(false);
+
+  const filteredManis = maniFilter.trim()
+    ? manicurists.filter((m) => m.user.name.toLowerCase().includes(maniFilter.toLowerCase().trim()))
+    : manicurists;
+  /** Profesional efectivamente asignada al turno (auto-elegida por slot o selección manual). */
+  const assignedManiName = manicurists.find((m) => m.id === watch("manicuristId"))?.user.name ?? "";
+
+  /** Inicio base del turno (ISO): slot elegido u hora manual. */
+  const baseStartIso = (() => {
+    const v = watch("startAt");
+    if (v) return v;
+    if (timeEntryMode === "manual" && pickerDate && manualHour !== "" && manualMinute !== "") {
+      const h = parseInt(manualHour, 10);
+      const m = parseInt(manualMinute, 10);
+      if (!isNaN(h) && !isNaN(m) && h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+        return canaryDate(pickerDate, h, m).toISOString();
+      }
+    }
+    return "";
+  })();
+
+  /** Inicio efectivo (ISO) de cada línea: la 1ª usa el horario global; el resto su hora propia o continúan tras la anterior. */
+  const effectiveLineStarts: string[] = (() => {
+    const result: string[] = [];
+    let prevEndMs = baseStartIso ? new Date(baseStartIso).getTime() : NaN;
+    for (const item of selectedServices) {
+      const svc = services.find((s) => s.id === item.serviceId);
+      const dur = lineDurationMinutes(item, svc);
+      let startMs = prevEndMs;
+      if (item.startTime && /^\d{1,2}:\d{2}$/.test(item.startTime) && !isNaN(prevEndMs)) {
+        const [h, m] = item.startTime.split(":").map(Number);
+        const baseDay = format(toCanaryTimezone(new Date(prevEndMs)), "yyyy-MM-dd");
+        startMs = canaryDate(baseDay, h, m).getTime();
+      }
+      if (isNaN(startMs)) { result.push(""); continue; }
+      result.push(new Date(startMs).toISOString());
+      prevEndMs = startMs + dur * 60000;
+    }
+    return result;
+  })();
 
   const loadSlotsNext = useCallback(
     async (serviceId: string, duration: number, manicuristId: string, signal: AbortSignal) => {
@@ -372,6 +419,8 @@ export default function NewAppointmentButton({
       if (slot.manicuristId !== manicuristFilter) {
         setManicuristFilter(slot.manicuristId);
       }
+      const man = manicurists.find((m) => m.id === slot.manicuristId);
+      setManiFilter(man?.user.name ?? "");
     }
   }
 
@@ -385,6 +434,8 @@ export default function NewAppointmentButton({
     setApptDurationOverride(null);
     setApptDurationDisplay(undefined);
     setManicuristFilter(lockedManicuristId ?? "");
+    setManiFilter("");
+    setManiShowDropdown(false);
     setPickerDate("");
     setSlotOptions([]);
     setError(null);
@@ -392,7 +443,7 @@ export default function NewAppointmentButton({
     setSelectedClientId("");
     setClientShowDropdown(false);
     setShowNewClient(false);
-    setNewClient({ name: "", phone: "", email: "", notes: "" });
+    setNewClient({ name: "", phone: "+34 ", email: "", notes: "" });
     setNewClientError("");
     setSendWhatsApp(true);
     setTimeEntryMode("slots");
@@ -413,12 +464,14 @@ export default function NewAppointmentButton({
     setNewClientError("");
     setNewClientLoading(true);
     try {
+      const rawPhone = newClient.phone.trim();
+      const phone = rawPhone.startsWith("+") ? rawPhone : `+34 ${rawPhone.replace(/\+/g, "")}`.trim();
       const res = await fetch("/api/clients", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: newClient.name.trim(),
-          phone: newClient.phone.trim(),
+          phone,
           email: newClient.email.trim() || undefined,
           notes: newClient.notes.trim() || undefined,
         }),
@@ -432,7 +485,7 @@ export default function NewAppointmentButton({
       setClientsList((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
       setValue("clientId", created.id, { shouldValidate: true });
       setShowNewClient(false);
-      setNewClient({ name: "", phone: "", email: "", notes: "" });
+      setNewClient({ name: "", phone: "+34 ", email: "", notes: "" });
     } catch {
       setNewClientError("Error de conexión");
     } finally {
@@ -585,12 +638,30 @@ export default function NewAppointmentButton({
       return;
     }
 
+    // Validar horas personalizadas por línea
+    for (let idx = 0; idx < selectedServices.length; idx++) {
+      const t = selectedServices[idx].startTime;
+      if (t && !/^\d{1,2}:\d{2}$/.test(t)) {
+        const svc = services.find((s) => s.id === selectedServices[idx].serviceId);
+        setError(`Hora inválida en "${svc?.name ?? "servicio"}". Usá formato HH:mm.`);
+        return;
+      }
+      if (t) {
+        const [h, m] = t.split(":").map(Number);
+        if (h > 23 || m > 59) {
+          const svc = services.find((s) => s.id === selectedServices[idx].serviceId);
+          setError(`Hora inválida en "${svc?.name ?? "servicio"}". Hora entre 0:00 y 23:59.`);
+          return;
+        }
+      }
+    }
+
     if (!finalStartAt || !data.manicuristId || !data.clientId || selectedServices.length === 0) {
       setError(g(settings, "validation.fillAll", "Completá cliente, al menos un servicio y horario."));
       return;
     }
     try {
-      const servicesPayload = selectedServices.map((s) => {
+      const servicesPayload = selectedServices.map((s, idx) => {
         const svc = services.find((x) => x.id === s.serviceId);
         const dur = lineDurationMinutes(s, svc);
         const priceLine = linePriceAmount(s, svc);
@@ -599,6 +670,9 @@ export default function NewAppointmentButton({
           durationMinutes: dur,
           price: priceLine,
           manicuristId: s.manicuristId || undefined,
+          ...(idx > 0 && s.startTime && effectiveLineStarts[idx]
+            ? { startAt: effectiveLineStarts[idx] }
+            : {}),
         };
       });
       const priceForSubmit = (() => {
@@ -827,7 +901,7 @@ export default function NewAppointmentButton({
                             type="tel"
                             value={newClient.phone}
                             onChange={(e) => setNewClient((p) => ({ ...p, phone: e.target.value }))}
-                            placeholder="549XXXXXXXXXX"
+                            placeholder="+34 612 345 678"
                             required
                             className={inputCls}
                           />
@@ -1031,6 +1105,28 @@ export default function NewAppointmentButton({
                               </select>
                             </div>
                           </div>
+                          {idx > 0 && (
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className="text-[10px] text-earth-muted whitespace-nowrap">Inicio:</span>
+                              <input
+                                type="time"
+                                value={item.startTime ?? ""}
+                                onChange={(e) =>
+                                  setSelectedServices((prev) =>
+                                    prev.map((s, i) =>
+                                      i === idx ? { ...s, startTime: e.target.value || undefined } : s
+                                    )
+                                  )
+                                }
+                                className="w-auto px-2 py-1 text-xs border border-[#D7CCC8] rounded bg-white"
+                              />
+                              {!item.startTime && effectiveLineStarts[idx] && (
+                                <span className="text-[9px] text-emerald-600 whitespace-nowrap" title="Inicio automático tras la línea anterior">
+                                  → {formatHour(new Date(effectiveLineStarts[idx]))}
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
                         <button
                           type="button"
@@ -1240,17 +1336,76 @@ export default function NewAppointmentButton({
                   {!lockedManicuristId ? (
                     <div>
                       <label className={labelCls}>{g(settings, "form.field.manicurist", "Profesional")}</label>
-                      <select
-                        value={manicuristFilter}
-                        onChange={(e) => setManicuristFilter(e.target.value)}
-                        className={inputCls}
-                      >
-                        <option value="">{g(settings, "form.select.anyManicurist", "Cualquiera (próximos disponibles)")}</option>
-                        {manicurists.map((m) => (
-                          <option key={m.id} value={m.id}>{m.user.name}</option>
-                        ))}
-                      </select>
+                      <div className="relative mani-autocomplete">
+                        <input
+                          type="text"
+                          autoComplete="off"
+                          placeholder={g(settings, "form.select.anyManicurist", "Cualquiera (próximos disponibles)")}
+                          value={maniFilter}
+                          onChange={(e) => {
+                            setManiFilter(e.target.value);
+                            setManiShowDropdown(true);
+                          }}
+                          onFocus={() => setManiShowDropdown(true)}
+                          className={inputCls}
+                        />
+                        {maniFilter && (
+                          <button
+                            type="button"
+                            onClick={() => { setManiFilter(""); setManicuristFilter(""); }}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-earth-muted hover:text-earth"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">close</span>
+                          </button>
+                        )}
+                        {maniShowDropdown && (
+                          <div className="absolute z-20 w-full mt-1 bg-white border border-[#D7CCC8] rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                            {!maniFilter.trim() && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setManicuristFilter("");
+                                  setManiFilter("");
+                                  setManiShowDropdown(false);
+                                }}
+                                className={cn(
+                                  "w-full px-3 py-2 text-left text-sm hover:bg-primary/10",
+                                  !manicuristFilter && "bg-primary/10 font-semibold text-primary-dark"
+                                )}
+                              >
+                                {g(settings, "form.select.anyManicurist", "Cualquiera (próximos disponibles)")}
+                              </button>
+                            )}
+                            {filteredManis.map((m) => (
+                              <button
+                                key={m.id}
+                                type="button"
+                                onClick={() => {
+                                  setManicuristFilter(m.id);
+                                  setManiFilter(m.user.name);
+                                  setManiShowDropdown(false);
+                                }}
+                                className={cn(
+                                  "w-full px-3 py-2 text-left text-sm hover:bg-primary/10",
+                                  manicuristFilter === m.id && "bg-primary/10 font-semibold text-primary-dark"
+                                )}
+                              >
+                                {m.user.name}
+                              </button>
+                            ))}
+                            {maniFilter.trim() && filteredManis.length === 0 && (
+                              <p className="px-3 py-2 text-xs text-earth-muted">Sin resultados</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
                       {errors.manicuristId && <p className="text-red-500 text-xs mt-1">{g(settings, "validation.selectManicurist", "Seleccioná una profesional")}</p>}
+                      {assignedManiName && (
+                        <p className="text-[11px] text-emerald-700 mt-1.5 flex items-center gap-1 bg-emerald-50 border border-emerald-100 rounded-md px-2 py-1 w-fit">
+                          <span className="material-symbols-outlined text-[13px]">check_circle</span>
+                          Se asignará a: <span className="font-semibold">{assignedManiName}</span>
+                        </p>
+                      )}
                     </div>
                   ) : (
                     /* Show the locked manicurist as read-only info */

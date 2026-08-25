@@ -123,7 +123,7 @@ export async function clientHasOverlappingAppointment(
 
 export async function createAppointment(
   input: CreateAppointmentInput
-): Promise<AppointmentWithRelations> {
+): Promise<AppointmentWithRelations[]> {
   const serviceItems = input.services?.length
     ? input.services
     : input.serviceId
@@ -139,81 +139,88 @@ export async function createAppointment(
   });
   const serviceMap = new Map(servicesData.map((s) => [s.id, s]));
 
-  let totalDuration = 0;
-  let totalPrice = 0;
   const firstServiceId = serviceItems[0].serviceId;
   const businessId = serviceMap.get(firstServiceId)?.businessId;
   if (!businessId) throw new Error("Servicio no encontrado.");
 
-  for (const item of serviceItems) {
+  const baseStartAt = new Date(input.startAt);
+  const created: AppointmentWithRelations[] = [];
+  /** IDs creados en este mismo lote: se excluyen del chequeo de solapamiento del cliente
+   *  para permitir servicios simultáneos con distintas profesionales (ej. mani + pedi). */
+  const batchIds: string[] = [];
+
+  for (let i = 0; i < serviceItems.length; i++) {
+    const item = serviceItems[i];
     const svc = serviceMap.get(item.serviceId);
     if (!svc) throw new Error(`Servicio ${item.serviceId} no encontrado.`);
+
     const dur = item.durationMinutes ?? svc.duration;
-    totalDuration += dur;
-    const linePrice =
-      item.price != null && item.price >= 0 ? item.price : Number(svc.price);
-    totalPrice += linePrice;
-  }
+    const price = item.price != null && item.price >= 0 ? item.price : Number(svc.price);
+    const manicuristId = item.manicuristId ?? input.manicuristId;
 
-  const finalPrice = input.price != null && input.price >= 0 ? input.price : totalPrice;
+    if (!manicuristId) {
+      throw new Error(`Indicá quién realiza "${svc.name}".`);
+    }
 
-  const slotDuration =
-    input.totalDurationMinutes != null && input.totalDurationMinutes >= 5
-      ? input.totalDurationMinutes
-      : totalDuration;
+    // Hora de inicio: explícita por línea → si no, la primera usa startAt global y el resto continúan secuencialmente
+    const startAt = item.startAt
+      ? new Date(item.startAt)
+      : i === 0
+        ? baseStartAt
+        : calcEndTime(created[i - 1].endAt, 0);
+    const endAt = calcEndTime(startAt, dur);
 
-  const startAt = new Date(input.startAt);
-  const endAt = calcEndTime(startAt, slotDuration);
+    const available = await isSlotAvailable(manicuristId, startAt, endAt);
+    if (!available) {
+      const timeStr = format(toCanaryTimezone(startAt), "HH:mm");
+      throw new Error(`No hay disponibilidad para "${svc.name}" a las ${timeStr}.`);
+    }
 
-  const available = await isSlotAvailable(input.manicuristId, startAt, endAt);
-  if (!available) {
-    throw new Error("El horario seleccionado no está disponible.");
-  }
-
-  const existing = await getClientOverlappingAppointment(
-    input.clientId,
-    startAt,
-    endAt
-  );
-  if (existing) {
-    const range = `${format(toCanaryTimezone(existing.startAt), "d/M HH:mm", { locale: es })} – ${format(toCanaryTimezone(existing.endAt), "HH:mm", { locale: es })}`;
-    throw new Error(`El cliente ya tiene un turno en ese horario (${range}). Elegí otro horario o revisá el calendario.`);
-  }
-
-  const appointment = await prisma.appointment.create({
-    data: {
-      businessId,
-      clientId: input.clientId,
-      manicuristId: input.manicuristId,
-      serviceId: firstServiceId,
+    const existing = await getClientOverlappingAppointment(
+      input.clientId,
       startAt,
-      endAt,
-      price: finalPrice,
-      notes: input.notes,
-      status: "CONFIRMED",
-      services: {
-        create: serviceItems.map((item, i) => {
-          const svc = serviceMap.get(item.serviceId)!;
-          const linePrice =
-            item.price != null && item.price >= 0 ? item.price : Number(svc.price);
-          return {
-            serviceId: item.serviceId,
-            durationMinutes: item.durationMinutes ?? null,
-            price: linePrice,
-            sortOrder: i,
-          };
-        }),
-      },
-    },
-    include: appointmentInclude,
-  });
+      endAt
+    );
+    if (existing && !batchIds.includes(existing.id)) {
+      const range = `${format(toCanaryTimezone(existing.startAt), "d/M HH:mm", { locale: es })} – ${format(toCanaryTimezone(existing.endAt), "HH:mm", { locale: es })}`;
+      throw new Error(`El cliente ya tiene un turno en ${range}. Revisá el calendario.`);
+    }
 
-  if (input.sendWhatsApp !== false) {
-    void enqueueConfirmation(appointment.id);
-    void scheduleReminder(appointment.id, startAt);
+    const appointment = await prisma.appointment.create({
+      data: {
+        businessId,
+        clientId: input.clientId,
+        manicuristId,
+        serviceId: item.serviceId,
+        startAt,
+        endAt,
+        price,
+        notes: i === 0 ? input.notes : undefined,
+        status: "CONFIRMED",
+        services: {
+          create: {
+            serviceId: item.serviceId,
+            manicuristId: item.manicuristId ?? null,
+            durationMinutes: item.durationMinutes ?? null,
+            price,
+            sortOrder: 0,
+          },
+        },
+      },
+      include: appointmentInclude,
+    });
+
+    created.push(appointment as AppointmentWithRelations);
+    batchIds.push(appointment.id);
   }
 
-  return appointment as AppointmentWithRelations;
+  // Enviar WhatsApp solo para el primer turno
+  if (input.sendWhatsApp !== false && created.length > 0) {
+    void enqueueConfirmation(created[0].id);
+    void scheduleReminder(created[0].id, created[0].startAt);
+  }
+
+  return created;
 }
 
 // ─── Update ───────────────────────────────────────────────────────────────────
@@ -227,14 +234,19 @@ export async function updateAppointment(
 
     const completed = await prisma.appointment.update({
       where: { id },
-      data: { status: "COMPLETED" },
+      data: {
+        status: "COMPLETED",
+        ...(input.paymentMethod !== undefined && { paymentMethod: input.paymentMethod }),
+      },
       include: appointmentInclude,
     });
 
-    // Auto-generate invoice (fire-and-forget)
-    void generateInvoiceFromAppointment(id).catch((err) => {
-      console.error(`[Invoice] Failed to generate for appointment ${id}:`, err);
-    });
+    // Generate invoice only for Bizum / Datáfono (Efectivo = sin factura)
+    if (input.paymentMethod === "BIZUM" || input.paymentMethod === "DATAFONO") {
+      void generateInvoiceFromAppointment(id, { paymentMethod: input.paymentMethod }).catch((err) => {
+        console.error(`[Invoice] Failed to generate for appointment ${id}:`, err);
+      });
+    }
 
     return completed as AppointmentWithRelations;
   }
@@ -268,7 +280,9 @@ export async function updateAppointment(
         ? input.totalDurationMinutes
         : totalDuration;
     const endAt = calcEndTime(startAt, slotDuration);
-    const manicuristId = input.manicuristId ?? existing.manicuristId;
+    // Derivar manicurista principal: input → existente → primer servicio con manicuristId
+    const derivedManicuristId = serviceItems.find((s) => s.manicuristId)?.manicuristId;
+    const manicuristId = input.manicuristId ?? derivedManicuristId ?? existing.manicuristId;
     const clientId = input.clientId ?? existing.clientId;
     const finalPrice = input.price != null && input.price >= 0 ? input.price : totalPrice;
 
@@ -292,6 +306,7 @@ export async function updateAppointment(
           data: {
             appointmentId: id,
             serviceId: item.serviceId,
+            manicuristId: item.manicuristId ?? null,
             durationMinutes: item.durationMinutes ?? null,
             price: linePrice,
             sortOrder: i,
@@ -595,12 +610,8 @@ export async function autoCompleteExpiredAppointments(): Promise<number> {
     data: { status: "COMPLETED" },
   });
 
-  // Auto-generate invoices for each completed appointment
-  for (const appt of expired) {
-    void generateInvoiceFromAppointment(appt.id).catch((err) => {
-      console.error(`[Invoice] Auto-generate failed for ${appt.id}:`, err);
-    });
-  }
+  // No auto-generate invoices: payment method is unknown for auto-completed appointments.
+  // Invoices are only generated when a manicurist manually completes with Bizum / Datáfono.
 
   return expired.length;
 }
@@ -617,6 +628,9 @@ const appointmentInclude = {
     orderBy: { sortOrder: "asc" },
     include: {
       service: { select: { id: true, name: true, duration: true, color: true } },
+      manicurist: {
+        select: { id: true, user: { select: { name: true } } },
+      },
     },
   },
 } as const;

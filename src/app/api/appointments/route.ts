@@ -19,11 +19,13 @@ const appointmentServiceSchema = z.object({
   serviceId: z.string().cuid(),
   durationMinutes: z.number().int().positive().optional(),
   price: z.number().min(0).optional(),
+  manicuristId: z.string().cuid().optional(),
+  startAt: z.string().datetime().optional(),
 });
 
 const createSchema = z.object({
   clientId: z.string().cuid(),
-  manicuristId: z.string().cuid(),
+  manicuristId: z.string().cuid().optional(),
   serviceId: z.string().cuid().optional(),
   services: z.array(appointmentServiceSchema).optional(),
   startAt: z.string().datetime(),
@@ -110,8 +112,8 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const appointment = await createAppointment(parsed.data);
-    return NextResponse.json(apiSuccess(appointment), { status: 201 });
+    const appointments = await createAppointment(parsed.data);
+    return NextResponse.json(apiSuccess(appointments), { status: 201 });
   } catch (err) {
     return NextResponse.json(apiError(String(err), "BUSINESS"), { status: 409 });
   }

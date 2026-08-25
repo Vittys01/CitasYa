@@ -227,7 +227,7 @@ async function main() {
     { key: "form.field.fullName",          value: "Nombre completo" },
     { key: "form.placeholder.name",        value: "María García" },
     { key: "form.field.phone",             value: "WhatsApp / Teléfono" },
-    { key: "form.placeholder.phone",       value: "+54 9 11 1234-5678, +57 300 1234567, +34 612 345 678" },
+    { key: "form.placeholder.phone",       value: "+34 612 345 678" },
     { key: "validation.phoneRequired",     value: "Ingresá el teléfono" },
     { key: "form.field.emailOptional",     value: "Email (opcional)" },
     { key: "form.placeholder.email",       value: "cliente@email.com" },

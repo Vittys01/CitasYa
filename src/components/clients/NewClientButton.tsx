@@ -32,24 +32,29 @@ function buildSchema(s: Record<string, string> | undefined) {
   });
 }
 
+function normalizePhone(v: string) {
+    const t = v.trim();
+    return t.startsWith("+") ? t : `+34 ${t.replace(/\+/g, "")}`.trim();
+}
+
 export default function NewClientButton({ settings }: Props) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
   const { register, handleSubmit, reset, formState: { errors, isSubmitting } } =
-    useForm<FormData>({ resolver: zodResolver(buildSchema(settings)) });
+    useForm<FormData>({ resolver: zodResolver(buildSchema(settings)), defaultValues: { phone: "+34 " } });
 
   async function onSubmit(data: FormData) {
     setError(null);
     const res = await fetch("/api/clients", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
+      body: JSON.stringify({ ...data, phone: normalizePhone(data.phone) }),
     });
     const json = await res.json();
     if (!res.ok) { setError(json.error?.message ?? g(settings, "error.createClient", "Error al crear el cliente")); return; }
-    reset();
+    reset({ phone: "+34 " });
     setOpen(false);
     router.refresh();
   }
@@ -89,7 +94,7 @@ export default function NewClientButton({ settings }: Props) {
                 <input
                   type="tel"
                   {...register("phone")}
-                  placeholder={g(settings, "form.placeholder.phone", "+54 9 11 1234-5678, +57 300 1234567, +34 612 345 678")}
+                  placeholder={g(settings, "form.placeholder.phone", "+34 612 345 678")}
                   className={inputCls}
                 />
                 {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone.message}</p>}
