@@ -11,7 +11,7 @@ import { getInvoices } from "@/services/invoice.service";
 import { serializeInvoice } from "@/lib/serialize";
 import { z } from "zod";
 
-const INVOICE_ROLES = ["OWNER", "ADMIN"] as const;
+const INVOICE_ROLES = ["OWNER", "ADMIN", "MANICURIST"] as const;
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -22,6 +22,7 @@ export async function GET(req: NextRequest) {
   const businessId = await resolveBusinessIdFromSession(session);
   if (!businessId) return NextResponse.json(apiError("No business context"), { status: 403 });
 
+  const isManicurist = session.user.role === "MANICURIST";
   const { searchParams } = req.nextUrl;
   const result = await getInvoices(businessId, {
     dateFrom: searchParams.get("dateFrom") ?? undefined,
@@ -29,6 +30,10 @@ export async function GET(req: NextRequest) {
     clientId: searchParams.get("clientId") ?? undefined,
     status: (searchParams.get("status") as "DRAFT" | "ISSUED" | "CANCELLED") ?? undefined,
     q: searchParams.get("q") ?? undefined,
+    manicuristId: isManicurist
+      ? session.user.manicuristId ?? undefined
+      : searchParams.get("manicuristId") ?? undefined,
+    paymentMethod: (searchParams.get("paymentMethod") as "EFECTIVO" | "BIZUM" | "DATAFONO") ?? undefined,
     page: parseInt(searchParams.get("page") ?? "1"),
     limit: parseInt(searchParams.get("limit") ?? "20"),
   });

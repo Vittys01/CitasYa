@@ -14,7 +14,7 @@ import { getInvoice } from "@/services/invoice.service";
 import { generateInvoicePdf } from "@/lib/pdf-invoice";
 import { generateReceiptPdf } from "@/lib/thermal-receipt";
 
-const INVOICE_ROLES = ["OWNER", "ADMIN"] as const;
+const INVOICE_ROLES = ["OWNER", "ADMIN", "MANICURIST"] as const;
 
 export async function GET(
   req: NextRequest,
@@ -29,7 +29,12 @@ export async function GET(
   const businessId = await resolveBusinessIdFromSession(session);
   if (!businessId) return NextResponse.json(apiError("No business context"), { status: 403 });
 
-  const invoice = await getInvoice(id, businessId);
+  const isManicurist = session.user.role === "MANICURIST";
+  const invoice = await getInvoice(
+    id,
+    businessId,
+    isManicurist ? session.user.manicuristId ?? undefined : undefined
+  );
   if (!invoice) return NextResponse.json(apiError("Not found"), { status: 404 });
 
   const { searchParams } = new URL(req.url);

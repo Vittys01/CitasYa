@@ -11,7 +11,7 @@
 import { prisma } from "@/lib/db";
 import { buildPaginationMeta, now, canaryDate } from "@/lib/utils";
 import type { InvoiceWithRelations, InvoiceFilters } from "@/types";
-import type { InvoiceStatus } from "@prisma/client";
+import type { InvoiceStatus, PaymentMethod } from "@prisma/client";
 
 // ─── Invoice number generation (atomic) ──────────────────────────────────────
 
@@ -23,7 +23,8 @@ function formatInvoiceNumber(prefix: string | null, num: number): string {
 // ─── Generate from appointment ────────────────────────────────────────────────
 
 export async function generateInvoiceFromAppointment(
-  appointmentId: string
+  appointmentId: string,
+  opts?: { paymentMethod?: PaymentMethod }
 ): Promise<InvoiceWithRelations | null> {
   const appointment = await prisma.appointment.findUnique({
     where: { id: appointmentId },
@@ -104,6 +105,7 @@ export async function generateInvoiceFromAppointment(
         prefix,
         formattedNumber: formatted,
         appointmentId: appointmentId,
+        manicuristId: appointment.manicuristId,
         clientId: client.id,
         clientName: client.name,
         clientNif: client.nif,
@@ -112,7 +114,8 @@ export async function generateInvoiceFromAppointment(
         businessNif: biz.nif,
         businessAddress,
         issuedAt: now(),
-        status: "DRAFT",
+        status: "ISSUED",
+        paymentMethod: opts?.paymentMethod ?? null,
         baseImponible,
         ivaRate,
         ivaAmount,
@@ -143,7 +146,7 @@ export async function getInvoices(
   businessId: string,
   filters: InvoiceFilters = {}
 ) {
-  const { dateFrom, dateTo, clientId, status, q, page = 1, limit = 20 } = filters;
+  const { dateFrom, dateTo, clientId, status, q, manicuristId, paymentMethod, page = 1, limit = 20 } = filters;
 
   const where: Record<string, unknown> = { businessId };
 
@@ -155,6 +158,8 @@ export async function getInvoices(
   }
   if (clientId) where.clientId = clientId;
   if (status) where.status = status;
+  if (manicuristId) where.manicuristId = manicuristId;
+  if (paymentMethod) where.paymentMethod = paymentMethod;
   if (q) {
     where.OR = [
       { formattedNumber: { contains: q, mode: "insensitive" } },
@@ -180,10 +185,11 @@ export async function getInvoices(
 
 export async function getInvoice(
   id: string,
-  businessId: string
+  businessId: string,
+  manicuristId?: string
 ): Promise<InvoiceWithRelations | null> {
   return prisma.invoice.findFirst({
-    where: { id, businessId },
+    where: { id, businessId, ...(manicuristId ? { manicuristId } : {}) },
     include: invoiceInclude,
   }) as Promise<InvoiceWithRelations | null>;
 }
@@ -193,14 +199,43 @@ export async function getInvoice(
 export async function updateInvoiceStatus(
   id: string,
   businessId: string,
-  status: InvoiceStatus
+  status: InvoiceStatus,
+  manicuristId?: string
 ): Promise<InvoiceWithRelations | null> {
-  const invoice = await prisma.invoice.findFirst({ where: { id, businessId } });
+  const invoice = await prisma.invoice.findFirst({
+    where: { id, businessId, ...(manicuristId ? { manicuristId } : {}) },
+  });
   if (!invoice) return null;
 
   const updated = await prisma.invoice.update({
     where: { id },
     data: { status },
+    include: invoiceInclude,
+  });
+
+  return updated as InvoiceWithRelations;
+}
+
+// ─── Update invoice (status + paymentMethod) ──────────────────────────────────
+
+export async function updateInvoice(
+  id: string,
+  businessId: string,
+  data: { status?: InvoiceStatus; paymentMethod?: PaymentMethod | null },
+  manicuristId?: string
+): Promise<InvoiceWithRelations | null> {
+  const invoice = await prisma.invoice.findFirst({
+    where: { id, businessId, ...(manicuristId ? { manicuristId } : {}) },
+  });
+  if (!invoice) return null;
+
+  const updateData: Record<string, unknown> = {};
+  if (data.status !== undefined) updateData.status = data.status;
+  if (data.paymentMethod !== undefined) updateData.paymentMethod = data.paymentMethod;
+
+  const updated = await prisma.invoice.update({
+    where: { id },
+    data: updateData,
     include: invoiceInclude,
   });
 
@@ -222,4 +257,5 @@ const invoiceInclude = {
   items: { orderBy: { sortOrder: "asc" as const } },
   client: { select: { id: true, name: true, phone: true, email: true, nif: true } },
   appointment: { select: { id: true, startAt: true, endAt: true } },
+  manicurist: { select: { id: true, user: { select: { name: true } } } },
 } as const;

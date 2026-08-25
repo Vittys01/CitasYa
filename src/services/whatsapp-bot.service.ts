@@ -510,13 +510,14 @@ async function handleSmartBookingFlow(
         manicuristName: manicurist.user.name,
       });
 
-      const appointment = await createAppointment({
+      const createdAppts = await createAppointment({
         clientId: currentData.clientId!,
         manicuristId: manicurist.id,
         serviceId: currentData.serviceId!,
         startAt: bestSlot.start.toISOString(),
         sendWhatsApp: true,
       });
+      const appointment = createdAppts[0];
 
       const appointmentWithRelations = await prisma.appointment.findUnique({
         where: { id: appointment.id },
@@ -861,13 +862,14 @@ async function handleSlotSelection(
     };
   }
 
-  const appointment = await createAppointment({
+  const createdAppts = await createAppointment({
     clientId: data.clientId,
     manicuristId: data.manicuristId!,
     serviceId: data.serviceId!,
     startAt: selectedSlot.start.toISOString(),
     sendWhatsApp: true,
   });
+  const appointment = createdAppts[0];
 
   // Limpiar datos temporales de la sesión
   const cleanedData = clearTemporarySessionData(data);

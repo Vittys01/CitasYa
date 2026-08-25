@@ -55,6 +55,12 @@ export default function InvoiceDetailView({ invoice }: Props) {
     CANCELLED: "bg-red-100 text-red-800",
   };
 
+  const paymentLabel: Record<string, string> = {
+    EFECTIVO: "Efectivo",
+    BIZUM: "Bizum",
+    DATAFONO: "Datáfono",
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -192,6 +198,12 @@ export default function InvoiceDetailView({ invoice }: Props) {
               <span className="text-[#7f5539]">TOTAL</span>
               <span className="text-[#7f5539]">{EUR(invoice.total)} EUR</span>
             </div>
+            {invoice.paymentMethod && (
+              <div className="flex justify-between text-sm border-t border-[#e6d5c3] pt-2">
+                <span className="text-[#7f6a5d]">Método de pago</span>
+                <span className="font-medium">{paymentLabel[invoice.paymentMethod] ?? invoice.paymentMethod}</span>
+              </div>
+            )}
           </div>
         </div>
 

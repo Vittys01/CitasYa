@@ -176,6 +176,13 @@ export async function generateInvoicePdf(
       : rgb(0.2, 0.6, 0.3);
   draw(`Estado: ${statusLabels[invoice.status] ?? invoice.status}`, 8.5, { center: true, color: statusColor });
   y -= 8.5 + LG;
+  if (invoice.paymentMethod) {
+    const paymentLabels: Record<string, string> = {
+      EFECTIVO: "Efectivo", BIZUM: "Bizum", DATAFONO: "Datáfono",
+    };
+    draw(`Método de pago: ${paymentLabels[invoice.paymentMethod] ?? invoice.paymentMethod}`, 8.5, { center: true, color: muted });
+    y -= 8.5 + LG;
+  }
   gap(8);
 
   // ── Footer ───────────────────────────────────────────────────────────

@@ -18,6 +18,7 @@ const appointmentServiceSchema = z.object({
   serviceId: z.string().cuid(),
   durationMinutes: z.number().int().positive().optional(),
   price: z.number().min(0).optional(),
+  manicuristId: z.string().cuid().optional(),
 });
 
 const updateSchema = z.object({
@@ -31,6 +32,7 @@ const updateSchema = z.object({
   price: z.number().min(0).optional(),
   totalDurationMinutes: z.number().int().min(5).max(1440).optional(),
   sendWhatsApp: z.boolean().optional(),
+  paymentMethod: z.enum(["EFECTIVO", "BIZUM", "DATAFONO"]).optional(),
 });
 
 type Params = { params: Promise<{ id: string }> };

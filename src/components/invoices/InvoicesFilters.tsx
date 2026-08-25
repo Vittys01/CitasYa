@@ -3,12 +3,19 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useCallback } from "react";
 
-export default function InvoicesFilters() {
+interface Props {
+  manicurists?: { id: string; name: string }[];
+  canFilterByTeam?: boolean;
+}
+
+export default function InvoicesFilters({ manicurists = [], canFilterByTeam = false }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const [q, setQ] = useState(searchParams.get("q") ?? "");
   const [status, setStatus] = useState(searchParams.get("status") ?? "");
+  const [manicuristId, setManicuristId] = useState(searchParams.get("manicuristId") ?? "");
+  const [paymentMethod, setPaymentMethod] = useState(searchParams.get("paymentMethod") ?? "");
   const [dateFrom, setDateFrom] = useState(searchParams.get("dateFrom") ?? "");
   const [dateTo, setDateTo] = useState(searchParams.get("dateTo") ?? "");
 
@@ -16,14 +23,18 @@ export default function InvoicesFilters() {
     const params = new URLSearchParams();
     if (q) params.set("q", q);
     if (status) params.set("status", status);
+    if (manicuristId) params.set("manicuristId", manicuristId);
+    if (paymentMethod) params.set("paymentMethod", paymentMethod);
     if (dateFrom) params.set("dateFrom", dateFrom);
     if (dateTo) params.set("dateTo", dateTo);
     router.push(`/facturas?${params.toString()}`);
-  }, [q, status, dateFrom, dateTo, router]);
+  }, [q, status, manicuristId, paymentMethod, dateFrom, dateTo, router]);
 
   const clear = useCallback(() => {
     setQ("");
     setStatus("");
+    setManicuristId("");
+    setPaymentMethod("");
     setDateFrom("");
     setDateTo("");
     router.push("/facturas");
@@ -52,6 +63,32 @@ export default function InvoicesFilters() {
           <option value="DRAFT">Borrador</option>
           <option value="ISSUED">Emitida</option>
           <option value="CANCELLED">Anulada</option>
+        </select>
+      </div>
+      {canFilterByTeam && (
+        <div className="min-w-[160px]">
+          <label className="block text-xs font-semibold text-earth uppercase tracking-wider mb-1">Equipo</label>
+          <select
+            value={manicuristId}
+            onChange={(e) => setManicuristId(e.target.value)}
+            className={inputCls + " w-full"}
+          >
+            <option value="">Todas</option>
+            {manicurists.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      <div className="min-w-[140px]">
+        <label className="block text-xs font-semibold text-earth uppercase tracking-wider mb-1">Pago</label>
+        <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className={inputCls + " w-full"}>
+          <option value="">Todos</option>
+          <option value="EFECTIVO">Efectivo</option>
+          <option value="BIZUM">Bizum</option>
+          <option value="DATAFONO">Datáfono</option>
         </select>
       </div>
       <div className="min-w-[140px]">

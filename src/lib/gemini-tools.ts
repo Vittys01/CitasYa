@@ -178,13 +178,14 @@ async function executeCreateAppointment(
   }
 
   try {
-    const appointment = await createAppointment({
+    const appointments = await createAppointment({
       clientId: client.id,
       manicuristId: args.manicurist_id,
       serviceId: args.service_id,
       startAt: args.start_at,
       sendWhatsApp: false, // El bot ya está en la conversación, no enviar notificación extra
     });
+    const appointment = appointments[0];
 
     // Obtener relaciones para la respuesta
     const full = await prisma.appointment.findUnique({

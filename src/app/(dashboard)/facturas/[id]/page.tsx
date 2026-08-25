@@ -6,7 +6,7 @@ import { serializeInvoice } from "@/lib/serialize";
 import InvoiceDetailView from "@/components/invoices/InvoiceDetailView";
 import Link from "next/link";
 
-const INVOICE_ROLES = ["OWNER", "ADMIN"];
+const INVOICE_ROLES = ["OWNER", "ADMIN", "MANICURIST"];
 
 export default async function FacturaDetailPage({
   params,
@@ -20,7 +20,12 @@ export default async function FacturaDetailPage({
   const businessId = await resolveBusinessIdFromSession(session);
   if (!businessId) redirect("/dashboard");
 
-  const invoice = await getInvoice(id, businessId);
+  const isManicurist = session.user.role === "MANICURIST";
+  const invoice = await getInvoice(
+    id,
+    businessId,
+    isManicurist ? session.user.manicuristId ?? undefined : undefined
+  );
   if (!invoice) notFound();
 
   const serialized = serializeInvoice(invoice);

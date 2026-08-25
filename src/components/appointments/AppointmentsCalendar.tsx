@@ -533,40 +533,51 @@ export default function AppointmentsCalendar({
               {(selectedAppointment.status === "PENDING" || selectedAppointment.status === "CONFIRMED") && (
                 <div className="pt-4 mt-4 border-t border-[#e6d5c3]">
                   {cancelError && <p className="text-red-500 text-xs mb-2">{cancelError}</p>}
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      if (!confirm((settings && settings["confirm.completeAppointment"]) ?? "¿Marcar este turno como completado?")) return;
-                      setCancelError(null);
-                      setCancelling(true);
-                      const res = await fetch(`/api/appointments/${selectedAppointment.id}`, {
-                        method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ status: "COMPLETED" }),
-                      });
-                      setCancelling(false);
-                      if (!res.ok) {
-                        const j = await res.json();
-                        setCancelError(j.error?.message ?? "Error al completar");
-                        return;
-                      }
-                      setAppointments((prev) => prev.map((a) => a.id === selectedAppointment.id ? { ...a, status: "COMPLETED" } : a));
-                      setFetchedByWeek((prev) => {
-                        const next = { ...prev };
-                        for (const key of Object.keys(next)) {
-                          next[key] = next[key].map((a) => a.id === selectedAppointment.id ? { ...a, status: "COMPLETED" } : a);
-                        }
-                        return next;
-                      });
-                      setSelectedAppointment(null);
-                      router.refresh();
-                    }}
-                    disabled={cancelling}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-medium border border-emerald-200 rounded-lg text-emerald-600 hover:bg-emerald-50 transition disabled:opacity-50"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">check_circle</span>
-                    {cancelling ? ((settings && settings["common.saving"]) ?? "Guardando...") : ((settings && settings["action.completeAppointment"]) ?? "Completar turno")}
-                  </button>
+                  <p className="text-[10px] font-bold text-earth-muted uppercase tracking-wider mb-2">
+                    {(settings && settings["action.completeAndCharge"]) ?? "Completar y cobrar"}
+                  </p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {([
+                      { method: "EFECTIVO", label: "Efectivo", icon: "payments" },
+                      { method: "BIZUM", label: "Bizum", icon: "smartphone" },
+                      { method: "DATAFONO", label: "Datáfono", icon: "credit_card" },
+                    ] as const).map(({ method, label, icon }) => (
+                      <button
+                        key={method}
+                        type="button"
+                        onClick={async () => {
+                          setCancelError(null);
+                          setCancelling(true);
+                          const res = await fetch(`/api/appointments/${selectedAppointment.id}`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ status: "COMPLETED", paymentMethod: method }),
+                          });
+                          setCancelling(false);
+                          if (!res.ok) {
+                            const j = await res.json();
+                            setCancelError(j.error?.message ?? "Error al completar");
+                            return;
+                          }
+                          setAppointments((prev) => prev.map((a) => a.id === selectedAppointment.id ? { ...a, status: "COMPLETED" } : a));
+                          setFetchedByWeek((prev) => {
+                            const next = { ...prev };
+                            for (const key of Object.keys(next)) {
+                              next[key] = next[key].map((a) => a.id === selectedAppointment.id ? { ...a, status: "COMPLETED" } : a);
+                            }
+                            return next;
+                          });
+                          setSelectedAppointment(null);
+                          router.refresh();
+                        }}
+                        disabled={cancelling}
+                        className="flex flex-col items-center gap-1 py-2.5 text-xs font-medium border border-[#e6d5c3] rounded-lg text-earth hover:bg-[#fbf6f1] transition disabled:opacity-50"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">{icon}</span>
+                        {cancelling ? "..." : label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
               {/* Cancel/delete appointment - only for PENDING and CONFIRMED */}

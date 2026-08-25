@@ -63,6 +63,7 @@ export async function generateReceiptPdf(
   if (hasIva && is80) h += (F.small + 1) * 2 + 4 + 8;
   h += 4 + F.total + 4 + 8;               // gap + total + gap + sep
   h += F.small + LG + 4;                   // status + gap
+  if (invoice.paymentMethod) h += F.small + LG;
   if (invoice.notes) h += F.small + 1;
   h += F.small + 1;                        // app name
   h += m;                                   // bottom margin
@@ -197,6 +198,13 @@ export async function generateReceiptPdf(
   };
   draw(`Estado: ${statusLabels[invoice.status] ?? invoice.status}`, F.small, { center: true, color: gray });
   y -= F.small + LG;
+  if (invoice.paymentMethod) {
+    const paymentLabels: Record<string, string> = {
+      EFECTIVO: "Efectivo", BIZUM: "Bizum", DATAFONO: "Datáfono",
+    };
+    draw(`Pago: ${paymentLabels[invoice.paymentMethod] ?? invoice.paymentMethod}`, F.small, { center: true, color: gray });
+    y -= F.small + LG;
+  }
   gap(4);
 
   // ── Footer ───────────────────────────────────────────────────────────

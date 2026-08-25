@@ -6,6 +6,8 @@ import type { InvoiceForClient } from "@/types";
 interface Props {
   invoices: InvoiceForClient[];
   meta: { total: number; page: number; totalPages: number; hasNextPage: boolean; hasPrevPage: boolean };
+  showTeamColumn?: boolean;
+  canEdit?: boolean;
 }
 
 const statusBadge: Record<string, string> = {
@@ -20,12 +22,25 @@ const statusLabel: Record<string, string> = {
   CANCELLED: "Anulada",
 };
 
+const paymentLabel: Record<string, string> = {
+  EFECTIVO: "Efectivo",
+  BIZUM: "Bizum",
+  DATAFONO: "Datáfono",
+};
+
+const paymentBadge: Record<string, string> = {
+  EFECTIVO: "bg-gray-100 text-gray-700",
+  BIZUM: "bg-blue-100 text-blue-800",
+  DATAFONO: "bg-purple-100 text-purple-800",
+};
+
 const EUR = (n: number) =>
   n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-export default function InvoicesTable({ invoices, meta }: Props) {
+export default function InvoicesTable({ invoices, meta, showTeamColumn = false, canEdit = true }: Props) {
   const [page, setPage] = useState(meta.page);
   const showIva = invoices.some((inv) => inv.ivaRate > 0);
+  const showPayment = invoices.some((inv) => inv.paymentMethod);
 
   const handleDownload = async (id: string, number: string) => {
     const res = await fetch(`/api/invoices/${id}/pdf`);
@@ -57,9 +72,11 @@ export default function InvoicesTable({ invoices, meta }: Props) {
               <th className="text-left px-4 py-3 font-semibold">Numero</th>
               <th className="text-left px-4 py-3 font-semibold hidden sm:table-cell">Fecha</th>
               <th className="text-left px-4 py-3 font-semibold">Cliente</th>
+              {showTeamColumn && <th className="text-left px-4 py-3 font-semibold hidden lg:table-cell">Equipo</th>}
               {showIva && <th className="text-right px-4 py-3 font-semibold hidden md:table-cell">Base</th>}
               {showIva && <th className="text-right px-4 py-3 font-semibold hidden md:table-cell">IVA</th>}
               <th className="text-right px-4 py-3 font-semibold">Total</th>
+              {showPayment && <th className="text-center px-4 py-3 font-semibold hidden md:table-cell">Pago</th>}
               <th className="text-center px-4 py-3 font-semibold">Estado</th>
               <th className="text-right px-4 py-3 font-semibold">Acciones</th>
             </tr>
@@ -67,7 +84,7 @@ export default function InvoicesTable({ invoices, meta }: Props) {
           <tbody className="divide-y divide-[#f0e6dc]">
             {invoices.length === 0 ? (
               <tr>
-                <td colSpan={showIva ? 8 : 6} className="px-4 py-8 text-center text-[#9c8273]">
+                <td colSpan={showPayment ? 10 : 9} className="px-4 py-8 text-center text-[#9c8273]">
                   No hay facturas emitidas todavia
                 </td>
               </tr>
@@ -83,9 +100,25 @@ export default function InvoicesTable({ invoices, meta }: Props) {
                     {new Date(inv.issuedAt).toLocaleDateString("es-ES", { timeZone: "Atlantic/Canary" })}
                   </td>
                   <td className="px-4 py-3">{inv.clientName}</td>
+                  {showTeamColumn && (
+                    <td className="px-4 py-3 text-[#7f6a5d] hidden lg:table-cell">
+                      {inv.manicurist?.name ?? "—"}
+                    </td>
+                  )}
                   {showIva && <td className="px-4 py-3 text-right hidden md:table-cell">{EUR(inv.baseImponible)}</td>}
                   {showIva && <td className="px-4 py-3 text-right hidden md:table-cell">{EUR(inv.ivaAmount)}</td>}
                   <td className="px-4 py-3 text-right font-semibold">{EUR(inv.total)} EUR</td>
+                  {showPayment && (
+                    <td className="px-4 py-3 text-center hidden md:table-cell">
+                      {inv.paymentMethod ? (
+                        <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${paymentBadge[inv.paymentMethod] ?? ""}`}>
+                          {paymentLabel[inv.paymentMethod] ?? inv.paymentMethod}
+                        </span>
+                      ) : (
+                        <span className="text-[#bcbbb6]">—</span>
+                      )}
+                    </td>
+                  )}
                   <td className="px-4 py-3 text-center">
                     <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge[inv.status] ?? ""}`}>
                       {statusLabel[inv.status] ?? inv.status}
@@ -100,7 +133,7 @@ export default function InvoicesTable({ invoices, meta }: Props) {
                       >
                         <span className="material-symbols-outlined text-[18px] text-[#7f5539]">picture_as_pdf</span>
                       </button>
-                      {inv.status === "DRAFT" && (
+                      {canEdit && inv.status === "DRAFT" && (
                         <button
                           onClick={() => handleStatusChange(inv.id, "ISSUED")}
                           className="p-1.5 rounded-lg hover:bg-[#f0e6dc] transition-colors"
@@ -109,7 +142,7 @@ export default function InvoicesTable({ invoices, meta }: Props) {
                           <span className="material-symbols-outlined text-[18px] text-green-700">check_circle</span>
                         </button>
                       )}
-                      {inv.status !== "CANCELLED" && (
+                      {canEdit && inv.status !== "CANCELLED" && (
                         <button
                           onClick={() => handleStatusChange(inv.id, "CANCELLED")}
                           className="p-1.5 rounded-lg hover:bg-[#f0e6dc] transition-colors"
