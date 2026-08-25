@@ -125,16 +125,38 @@ export default function NewAppointmentButton({
   // Sync if parent re-renders with updated clients (e.g. server refresh)
   useEffect(() => { setClientsList(clients); }, [clients]);
 
-  // ── Client autocomplete ─────────────────────────────────────────────────────
+  // ── Client autocomplete — misma búsqueda que /clients (nombre, teléfono o email, server-side) ──
   const [clientFilter, setClientFilter] = useState("");
   const [clientShowDropdown, setClientShowDropdown] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState("");
-  const filteredClients = clientFilter.trim()
-    ? clientsList.filter((c) => {
-        const q = clientFilter.toLowerCase().trim();
-        return c.name.toLowerCase().includes(q) || (c.phone && c.phone.includes(clientFilter.trim()));
-      }).slice(0, 10)
-    : clientsList.slice(0, 10);
+  const [clientResults, setClientResults] = useState<Client[]>([]);
+  const [clientSearching, setClientSearching] = useState(false);
+
+  useEffect(() => {
+    const q = clientFilter.trim();
+    if (!q) {
+      // Sin búsqueda: primeros 20 por nombre (igual que la primera página de /clients)
+      setClientResults([...clientsList].sort((a, b) => a.name.localeCompare(b.name)).slice(0, 20));
+      return;
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      setClientSearching(true);
+      fetch(`/api/clients?q=${encodeURIComponent(q)}&page=1&limit=20`, { signal: controller.signal })
+        .then((res) => res.json())
+        .then((json) => {
+          setClientResults((json?.clients ?? []) as Client[]);
+        })
+        .catch(() => { /* petición cancelada o error de red */ })
+        .finally(() => {
+          if (!controller.signal.aborted) setClientSearching(false);
+        });
+    }, 250);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [clientFilter, clientsList]);
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
@@ -820,9 +842,15 @@ export default function NewAppointmentButton({
                         <span className="material-symbols-outlined text-[18px]">close</span>
                       </button>
                     )}
-                    {clientShowDropdown && filteredClients.length > 0 && (
+                    {clientShowDropdown && (
                       <div className="absolute z-20 w-full mt-1 bg-white border border-[#D7CCC8] rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                        {filteredClients.map((c) => (
+                        {clientSearching && (
+                          <p className="px-3 py-2 text-xs text-earth-muted">Buscando...</p>
+                        )}
+                        {!clientSearching && clientResults.length === 0 && (
+                          <p className="px-3 py-2 text-xs text-earth-muted">No se encontraron clientes</p>
+                        )}
+                        {clientResults.map((c) => (
                           <button
                             key={c.id}
                             type="button"
@@ -832,10 +860,15 @@ export default function NewAppointmentButton({
                               setClientShowDropdown(false);
                               setValue("clientId", c.id, { shouldValidate: true });
                             }}
-                            className="w-full px-3 py-2 text-left text-sm hover:bg-primary/10 flex items-center justify-between"
+                            className="w-full px-3 py-2 text-left text-sm hover:bg-primary/10 flex items-center justify-between gap-2"
                           >
-                            <span className="font-medium text-earth">{c.name}</span>
-                            <span className="text-xs text-earth-muted">{c.phone}</span>
+                            <span className="min-w-0">
+                              <span className="font-medium text-earth block truncate">{c.name}</span>
+                              {c.email?.trim() && (
+                                <span className="block text-[10px] text-earth-muted truncate">{c.email}</span>
+                              )}
+                            </span>
+                            <span className="text-xs text-earth-muted shrink-0">{c.phone}</span>
                           </button>
                         ))}
                       </div>
