@@ -126,7 +126,7 @@ function AppointmentRow({ appt, settings }: { appt: AppointmentForClient; settin
   const startCanary = toCanaryTimezone(new Date(appt.startAt));
   const endCanary = toCanaryTimezone(new Date(appt.endAt));
   const dayStr = format(startCanary, "EEEE d 'de' MMMM", { locale: es });
-  const timeStr = `${format(startCanary, "HH:mm", { locale: es })} - ${format(endCanary, "HH:mm", { locale: es })}`;
+  const timeStr = `${formatTime(startCanary)} - ${formatTime(endCanary)}`;
 
   const s = statusStyles[appt.status];
   const label = statusLabels[appt.status] ?? appt.status;

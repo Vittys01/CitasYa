@@ -492,6 +492,7 @@ function formatTime(d: Date): string {
   return d.toLocaleTimeString("es-ES", {
     hour: "2-digit",
     minute: "2-digit",
+    hour12: true,
     timeZone: "Atlantic/Canary"
   });
 }

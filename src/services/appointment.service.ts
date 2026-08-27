@@ -17,6 +17,7 @@ import {
   SCHEDULE_SLOT_MINUTES,
   now,
   toCanaryTimezone,
+  formatTime,
   canaryDate,
   canaryDayBounds,
   getCanaryDateString,
@@ -172,7 +173,7 @@ export async function createAppointment(
 
     const available = await isSlotAvailable(manicuristId, startAt, endAt);
     if (!available) {
-      const timeStr = format(toCanaryTimezone(startAt), "HH:mm");
+      const timeStr = formatTime(toCanaryTimezone(startAt));
       throw new Error(`No hay disponibilidad para "${svc.name}" a las ${timeStr}.`);
     }
 
@@ -182,7 +183,7 @@ export async function createAppointment(
       endAt
     );
     if (existing && !batchIds.includes(existing.id)) {
-      const range = `${format(toCanaryTimezone(existing.startAt), "d/M HH:mm", { locale: es })} – ${format(toCanaryTimezone(existing.endAt), "HH:mm", { locale: es })}`;
+      const range = `${format(toCanaryTimezone(existing.startAt), "d/M", { locale: es })} ${formatTime(toCanaryTimezone(existing.startAt))} – ${formatTime(toCanaryTimezone(existing.endAt))}`;
       throw new Error(`El cliente ya tiene un turno en ${range}. Revisá el calendario.`);
     }
 
@@ -291,7 +292,7 @@ export async function updateAppointment(
 
     const other = await getClientOverlappingAppointment(clientId, startAt, endAt, id);
     if (other) {
-      const range = `${format(toCanaryTimezone(other.startAt), "d/M HH:mm", { locale: es })} – ${format(toCanaryTimezone(other.endAt), "HH:mm", { locale: es })}`;
+      const range = `${format(toCanaryTimezone(other.startAt), "d/M", { locale: es })} ${formatTime(toCanaryTimezone(other.startAt))} – ${formatTime(toCanaryTimezone(other.endAt))}`;
       throw new Error(`El cliente ya tiene un turno en ese horario (${range}). Elegí otro horario o revisá el calendario.`);
     }
 
@@ -367,7 +368,7 @@ export async function updateAppointment(
     const overlapClientId = input.clientId ?? existing.clientId;
     const other = await getClientOverlappingAppointment(overlapClientId, startAt, endAt, id);
     if (other) {
-      const range = `${format(toCanaryTimezone(other.startAt), "d/M HH:mm", { locale: es })} – ${format(toCanaryTimezone(other.endAt), "HH:mm", { locale: es })}`;
+      const range = `${format(toCanaryTimezone(other.startAt), "d/M", { locale: es })} ${formatTime(toCanaryTimezone(other.startAt))} – ${formatTime(toCanaryTimezone(other.endAt))}`;
       throw new Error(`El cliente ya tiene un turno en ese horario (${range}). Elegí otro horario o revisá el calendario.`);
     }
   }

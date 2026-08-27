@@ -89,7 +89,7 @@ import {
 } from "@/lib/bot-flow";
 import { addDays, format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import { now, normalisePhone, toCanaryTimezone } from "@/lib/utils";
+import { now, normalisePhone, toCanaryTimezone, formatTime } from "@/lib/utils";
 import {
   detectIntent,
   extractEntities,
@@ -1147,7 +1147,7 @@ async function handleAvailabilityQuery(
           .slice(0, 3)
           .map(
             (s) =>
-              format(toCanaryTimezone(s.start), "HH:mm", { locale: es })
+              formatTime(toCanaryTimezone(s.start))
           )
           .join(", ");
         message += `  • Hoy: ${times}\n`;
@@ -1157,7 +1157,7 @@ async function handleAvailabilityQuery(
           .slice(0, 3)
           .map(
             (s) =>
-              format(toCanaryTimezone(s.start), "HH:mm", { locale: es })
+              formatTime(toCanaryTimezone(s.start))
           )
           .join(", ");
         message += `  • Mañana: ${times}\n`;

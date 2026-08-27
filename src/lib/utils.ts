@@ -18,6 +18,7 @@ export function formatTime(date: Date): string {
   return date.toLocaleTimeString("es-ES", {
     hour: "2-digit",
     minute: "2-digit",
+    hour12: true,
     timeZone: "Atlantic/Canary"
   });
 }
@@ -42,12 +43,12 @@ export function formatDateShort(date: Date): string {
   });
 }
 
-/** Formato de hora (24h) para calendarios */
+/** Formato de hora (12h AM/PM) para calendarios */
 export function formatHour(date: Date): string {
   return date.toLocaleTimeString("es-ES", {
     hour: "2-digit",
     minute: "2-digit",
-    hour12: false,
+    hour12: true,
     timeZone: "Atlantic/Canary"
   });
 }

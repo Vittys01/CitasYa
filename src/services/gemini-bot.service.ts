@@ -189,7 +189,7 @@ export async function handleGeminiWhatsAppMessage(
   const systemPrompt = buildSystemPrompt({
     businessName,
     clientName: data.clientName,
-    currentTime: `${formatDate(currentTime)} ${currentTime.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: "Atlantic/Canary" })}`,
+    currentTime: `${formatDate(currentTime)} ${currentTime.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Atlantic/Canary" })}`,
   });
 
   const ctx: ToolContext = { businessId, phoneE164 };
